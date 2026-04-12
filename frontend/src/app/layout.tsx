@@ -1,20 +1,37 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Cormorant, Cormorant_Garamond, Source_Sans_3 } from "next/font/google";
+import { CustomCursor } from "@/components/CustomCursor";
+import { SiteFooter } from "@/components/SiteFooter";
+import { TopNav } from "@/components/TopNav";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const sourceSans = Source_Sans_3({
+  variable: "--font-ui",
   subsets: ["latin"],
+  weight: ["300", "400", "500", "600"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const cormorant = Cormorant({
+  variable: "--font-cormorant",
   subsets: ["latin"],
+  weight: ["300", "400", "600", "700"],
+  style: ["normal", "italic"],
+});
+
+const cormorantGaramond = Cormorant_Garamond({
+  variable: "--font-cormorant-garamond",
+  subsets: ["latin"],
+  weight: ["300", "400", "600"],
+  style: ["normal", "italic"],
 });
 
 export const metadata: Metadata = {
-  title: "Museo de Fósiles",
-  description: "Sistema de gestión y visualización de fósiles",
+  title: {
+    default: "Stonewake Museum — Fossil Collection",
+    template: "%s — Stonewake Museum",
+  },
+  description:
+    "Colección fósil y museo Stonewake: exploración visual del tiempo profundo.",
 };
 
 export default function RootLayout({
@@ -25,10 +42,13 @@ export default function RootLayout({
   return (
     <html lang="es" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${sourceSans.variable} ${cormorant.variable} ${cormorantGaramond.variable} antialiased`}
         suppressHydrationWarning
       >
+        <CustomCursor />
+        <TopNav />
         {children}
+        <SiteFooter />
       </body>
     </html>
   );
