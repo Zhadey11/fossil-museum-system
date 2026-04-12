@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" fill="none">
+  <rect width="400" height="400" fill="#121820"/>
+  <ellipse cx="200" cy="210" rx="130" ry="70" stroke="#7eb8da" stroke-width="2" fill="rgba(126,184,218,0.12)"/>
+  <path d="M70 210 Q200 120 330 210" stroke="#5a9bc4" stroke-width="2" fill="none"/>
+  <path d="M95 230h210M120 250h160" stroke="#7eb8da" stroke-width="1.5" opacity="0.6"/>
+  <circle cx="200" cy="200" r="8" fill="#c9a227" opacity="0.7"/>
+</svg>
