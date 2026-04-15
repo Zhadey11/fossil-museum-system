@@ -1,7 +1,24 @@
 ﻿USE FosilesDB;
 GO
 
--- Filtrados (excluye ficha borrada logicamente)
+-- Eliminar indices si ya existen para poder recrearlos limpiamente
+DROP INDEX IF EXISTS IX_FOSIL_estado          ON FOSIL;
+DROP INDEX IF EXISTS IX_FOSIL_categoria_estado ON FOSIL;
+DROP INDEX IF EXISTS IX_FOSIL_era_periodo      ON FOSIL;
+DROP INDEX IF EXISTS IX_FOSIL_canton           ON FOSIL;
+DROP INDEX IF EXISTS IX_FOSIL_explorador       ON FOSIL;
+DROP INDEX IF EXISTS IX_FOSIL_nombre           ON FOSIL;
+DROP INDEX IF EXISTS IX_FOSIL_pendientes       ON FOSIL;
+DROP INDEX IF EXISTS IX_USUARIO_email          ON USUARIO;
+DROP INDEX IF EXISTS IX_USUARIO_rol            ON USUARIO;
+DROP INDEX IF EXISTS IX_MULTI_FOSIL            ON MULTIMEDIA;
+DROP INDEX IF EXISTS IX_MULTI_PRINCIPAL        ON MULTIMEDIA;
+DROP INDEX IF EXISTS IX_ESTUDIO_FOSIL          ON ESTUDIO_CIENTIFICO;
+DROP INDEX IF EXISTS IX_PERIODO_ERA            ON PERIODO_GEOLOGICO;
+DROP INDEX IF EXISTS IX_LOG_USR                ON LOG_AUDITORIA;
+DROP INDEX IF EXISTS IX_LOG_REG                ON LOG_AUDITORIA;
+GO
+
 CREATE NONCLUSTERED INDEX IX_FOSIL_estado
     ON FOSIL (estado) INCLUDE (id, nombre, codigo_unico, slug, categoria_id, canton_id)
     WHERE deleted_at IS NULL;
@@ -32,12 +49,12 @@ CREATE NONCLUSTERED INDEX IX_FOSIL_nombre
     WHERE deleted_at IS NULL;
 GO
 
+-- CORRECCION: created_at sin DESC en indice filtrado (SQL Server no admite DESC en filtered index con INCLUDE)
 CREATE NONCLUSTERED INDEX IX_FOSIL_pendientes
-    ON FOSIL (estado, created_at DESC) INCLUDE (nombre, explorador_id, canton_id)
+    ON FOSIL (estado, created_at) INCLUDE (nombre, explorador_id, canton_id)
     WHERE estado IN ('pendiente','en_revision') AND deleted_at IS NULL;
 GO
 
--- Listados de usuario; multimedia/estudio; periodo y log
 CREATE NONCLUSTERED INDEX IX_USUARIO_email
     ON USUARIO (email) INCLUDE (id, rol_id, nombre, apellido, activo)
     WHERE deleted_at IS NULL;
@@ -63,7 +80,6 @@ CREATE NONCLUSTERED INDEX IX_ESTUDIO_FOSIL
     WHERE deleted_at IS NULL;
 GO
 
--- descripcion es TEXT: no se puede incluir en INCLUDE (solo nombre)
 CREATE NONCLUSTERED INDEX IX_PERIODO_ERA
     ON PERIODO_GEOLOGICO (era_id) INCLUDE (nombre);
 GO
@@ -76,7 +92,6 @@ CREATE NONCLUSTERED INDEX IX_LOG_REG
     ON LOG_AUDITORIA (tabla_afectada, registro_id, created_at DESC);
 GO
 
--- Catalogo publico / administracion / KPIs (multimedia activa: deleted_at IS NULL)
 CREATE OR ALTER VIEW VW_FOSILES_PUBLICOS AS
 SELECT
     f.id, f.codigo_unico, f.nombre, f.slug, f.descripcion_general,
@@ -160,20 +175,19 @@ GO
 
 CREATE OR ALTER VIEW VW_ESTADISTICAS AS
 SELECT
-    (SELECT COUNT(*) FROM FOSIL WHERE deleted_at IS NULL)                            AS total_fosiles,
-    (SELECT COUNT(*) FROM FOSIL WHERE estado='publicado' AND deleted_at IS NULL)     AS publicados,
-    (SELECT COUNT(*) FROM FOSIL WHERE estado='pendiente' AND deleted_at IS NULL)     AS pendientes,
-    (SELECT COUNT(*) FROM FOSIL WHERE estado='rechazado' AND deleted_at IS NULL)     AS rechazados,
-    (SELECT COUNT(*) FROM USUARIO WHERE deleted_at IS NULL AND activo=1)             AS total_usuarios,
+    (SELECT COUNT(*) FROM FOSIL WHERE deleted_at IS NULL)                                AS total_fosiles,
+    (SELECT COUNT(*) FROM FOSIL WHERE estado='publicado' AND deleted_at IS NULL)         AS publicados,
+    (SELECT COUNT(*) FROM FOSIL WHERE estado='pendiente' AND deleted_at IS NULL)         AS pendientes,
+    (SELECT COUNT(*) FROM FOSIL WHERE estado='rechazado' AND deleted_at IS NULL)         AS rechazados,
+    (SELECT COUNT(*) FROM USUARIO WHERE deleted_at IS NULL AND activo=1)                 AS total_usuarios,
     (SELECT COUNT(*) FROM USUARIO u INNER JOIN ROL r ON u.rol_id=r.id
-     WHERE r.nombre='investigador' AND u.deleted_at IS NULL)                         AS investigadores,
+     WHERE r.nombre='investigador' AND u.deleted_at IS NULL)                             AS investigadores,
     (SELECT COUNT(*) FROM USUARIO u INNER JOIN ROL r ON u.rol_id=r.id
-     WHERE r.nombre='explorador' AND u.deleted_at IS NULL)                           AS exploradores,
-    (SELECT COUNT(*) FROM MULTIMEDIA WHERE tipo='imagen' AND deleted_at IS NULL)    AS total_imagenes,
-    (SELECT COUNT(*) FROM ESTUDIO_CIENTIFICO WHERE publicado=1 AND deleted_at IS NULL) AS estudios_publicados;
+     WHERE r.nombre='explorador' AND u.deleted_at IS NULL)                               AS exploradores,
+    (SELECT COUNT(*) FROM MULTIMEDIA WHERE tipo='imagen' AND deleted_at IS NULL)         AS total_imagenes,
+    (SELECT COUNT(*) FROM ESTUDIO_CIENTIFICO WHERE publicado=1 AND deleted_at IS NULL)   AS estudios_publicados;
 GO
 
--- SPs: codigo, alta/edicion ficha, estado, borrado logico, consulta, busqueda
 CREATE OR ALTER PROCEDURE sp_generar_codigo_fosil
     @canton_id    INT,
     @categoria_id INT,
@@ -483,30 +497,45 @@ BEGIN
 END
 GO
 
+-- CORRECCION: CONTAINS/FREETEXT protegidos contra NULL en descripcion_detallada
 CREATE OR ALTER PROCEDURE sp_buscar_fosiles
-    @nombre       VARCHAR(255) = NULL,
-    @categoria_id INT          = NULL,
-    @era_id       INT          = NULL,
-    @periodo_id   INT          = NULL,
-    @canton_id    INT          = NULL,
-    @solo_publico BIT          = 1,
-    @pagina       INT          = 1,
-    @por_pagina   INT          = 12
+    @nombre        VARCHAR(255) = NULL,
+    @categoria_id  INT          = NULL,
+    @era_id        INT          = NULL,
+    @periodo_id    INT          = NULL,
+    @canton_id     INT          = NULL,
+    @solo_publico  BIT          = 1,
+    @pagina        INT          = 1,
+    @por_pagina    INT          = 12,
+    @modo_busqueda BIT          = 1
 AS
 BEGIN
     SET NOCOUNT ON;
     DECLARE @offset INT = (@pagina - 1) * @por_pagina;
 
     SELECT
-        f.id, f.codigo_unico, f.nombre, f.slug, f.descripcion_general,
-        f.estado, f.fecha_hallazgo, f.latitud, f.longitud,
+        f.id,
+        f.codigo_unico,
+        f.nombre,
+        f.slug,
+        f.descripcion_general,
+        f.estado,
+        f.fecha_hallazgo,
+        f.latitud,
+        f.longitud,
         cf.nombre  AS categoria_nombre,
         eg.nombre  AS era_nombre,
         pg.nombre  AS periodo_nombre,
         pv.nombre  AS provincia_nombre,
         c.nombre   AS canton_nombre,
-        (SELECT TOP 1 url FROM MULTIMEDIA m
-         WHERE m.fosil_id = f.id AND m.es_principal = 1 AND m.tipo = 'imagen' AND m.deleted_at IS NULL) AS imagen_principal,
+        (
+            SELECT TOP 1 url
+            FROM MULTIMEDIA m
+            WHERE m.fosil_id    = f.id
+              AND m.es_principal = 1
+              AND m.tipo         = 'imagen'
+              AND m.deleted_at   IS NULL
+        ) AS imagen_principal,
         COUNT(*) OVER() AS total_resultados
     FROM FOSIL f
         INNER JOIN CATEGORIA_FOSIL   cf ON f.categoria_id = cf.id
@@ -517,7 +546,25 @@ BEGIN
     WHERE
         f.deleted_at IS NULL
         AND (@solo_publico = 0 OR f.estado = 'publicado')
-        AND (@nombre       IS NULL OR f.nombre LIKE '%' + @nombre + '%')
+        AND (
+            @nombre IS NULL
+            OR (
+                @modo_busqueda = 0
+                AND (
+                    CONTAINS(f.nombre, @nombre)
+                    OR CONTAINS(f.descripcion_general, @nombre)
+                    OR (f.descripcion_detallada IS NOT NULL AND CONTAINS(f.descripcion_detallada, @nombre))
+                )
+            )
+            OR (
+                @modo_busqueda = 1
+                AND (
+                    FREETEXT(f.nombre, @nombre)
+                    OR FREETEXT(f.descripcion_general, @nombre)
+                    OR (f.descripcion_detallada IS NOT NULL AND FREETEXT(f.descripcion_detallada, @nombre))
+                )
+            )
+        )
         AND (@categoria_id IS NULL OR f.categoria_id = @categoria_id)
         AND (@era_id       IS NULL OR f.era_id       = @era_id)
         AND (@periodo_id   IS NULL OR f.periodo_id   = @periodo_id)
@@ -528,7 +575,6 @@ BEGIN
 END
 GO
 
--- Multimedia y estudios/referencias (log en LOG_AUDITORIA)
 CREATE OR ALTER PROCEDURE sp_agregar_multimedia
     @usuario_id       INT,
     @fosil_id         INT,
@@ -638,15 +684,15 @@ CREATE OR ALTER PROCEDURE sp_registrar_estudio
     @fosil_id                 INT,
     @investigador_id          INT,
     @titulo                   VARCHAR(300),
-    @contexto_objetivo       VARCHAR(MAX),
-    @tipo_analisis           VARCHAR(200),
-    @resultados              VARCHAR(MAX),
-    @composicion             VARCHAR(MAX) = NULL,
-    @condiciones_hallazgo    VARCHAR(MAX) = NULL,
-    @informacion_adicional   VARCHAR(MAX) = NULL,
-    @documentacion_contacto  VARCHAR(500) = NULL,
-    @publicado               BIT = 0,
-    @nuevo_id                INT OUTPUT
+    @contexto_objetivo        VARCHAR(MAX),
+    @tipo_analisis            VARCHAR(200),
+    @resultados               VARCHAR(MAX),
+    @composicion              VARCHAR(MAX) = NULL,
+    @condiciones_hallazgo     VARCHAR(MAX) = NULL,
+    @informacion_adicional    VARCHAR(MAX) = NULL,
+    @documentacion_contacto   VARCHAR(500) = NULL,
+    @publicado                BIT = 0,
+    @nuevo_id                 INT OUTPUT
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -803,5 +849,26 @@ BEGIN
 END
 GO
 
--- Full-text: omitido por ahora (instalar componente en SQL Server y anadir catalogo/indice aqui si lo necesitas)
+-- Full-Text: el catalogo y el index de FOSIL ya fueron creados antes de ejecutar este script.
+-- Solo creamos el Full-Text Index de TAXONOMIA si no existe aun.
+
+IF NOT EXISTS (
+    SELECT 1 FROM sys.fulltext_indexes
+    WHERE object_id = OBJECT_ID('dbo.TAXONOMIA')
+)
+BEGIN
+    CREATE FULLTEXT INDEX ON TAXONOMIA
+    (
+        reino,
+        filo,
+        clase,
+        orden,
+        familia,
+        genero,
+        especie
+    )
+    KEY INDEX PK_TAXONOMIA
+    ON FosilesCatalog
+    WITH STOPLIST = SYSTEM, CHANGE_TRACKING AUTO;
+END
 GO
