@@ -1,14 +1,6 @@
 USE FosilesDB;
 GO
 
-/*
-  Full-Text Search: requiere el componente "Full-Text and Semantic Extractions for Search"
-  en el instalador de SQL Server.
-
-  Este script es idempotente: si el catalogo o los indices ya existen, no falla al repetirlo.
-  Orden sugerido: 01_base_datos -> 02_tablas_principales -> este archivo -> 03_indices_vistas_sp.sql
-*/
-
 IF NOT EXISTS (SELECT 1 FROM sys.fulltext_catalogs WHERE name = N'FosilesCatalog')
 BEGIN
     CREATE FULLTEXT CATALOG FosilesCatalog AS DEFAULT;
