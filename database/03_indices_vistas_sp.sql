@@ -1,7 +1,6 @@
 ﻿USE FosilesDB;
 GO
 
--- Orden: 01_base_datos -> 02_tablas_principales -> 00_fulltext_setup.sql -> este archivo.
 -- Eliminar indices si ya existen para poder recrearlos limpiamente
 DROP INDEX IF EXISTS IX_FOSIL_estado          ON FOSIL;
 DROP INDEX IF EXISTS IX_FOSIL_categoria_estado ON FOSIL;
@@ -498,10 +497,7 @@ BEGIN
 END
 GO
 
--- Busqueda: columnas alineadas con el indice Full-Text en FOSIL y TAXONOMIA (00_fulltext_setup.sql).
--- @modo_busqueda: 0 = CONTAINS (palabras/frase, caracteres conflictivos atenuados),
---                 1 = FREETEXT (lenguaje natural),
---                 2 = subcadena (CHARINDEX, sin depender del catalogo FT).
+-- CORRECCION: CONTAINS/FREETEXT protegidos contra NULL en descripcion_detallada
 CREATE OR ALTER PROCEDURE sp_buscar_fosiles
     @nombre        VARCHAR(255) = NULL,
     @categoria_id  INT          = NULL,
@@ -511,27 +507,11 @@ CREATE OR ALTER PROCEDURE sp_buscar_fosiles
     @solo_publico  BIT          = 1,
     @pagina        INT          = 1,
     @por_pagina    INT          = 12,
-    @modo_busqueda TINYINT      = 1
+    @modo_busqueda BIT          = 1
 AS
 BEGIN
     SET NOCOUNT ON;
-
-    IF @modo_busqueda NOT IN (0, 1, 2)
-        SET @modo_busqueda = 1;
-
     DECLARE @offset INT = (@pagina - 1) * @por_pagina;
-    DECLARE @search_ft NVARCHAR(4000) = NULL;
-    DECLARE @busqueda_vacia BIT = 0;
-
-    IF @nombre IS NOT NULL
-    BEGIN
-        SET @search_ft = LTRIM(RTRIM(
-            REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(ISNULL(@nombre, N''),
-                N'"', N' '), N'&', N' '), N'|', N' '), N'(', N' '), N')', N' ')
-        ));
-        IF LEN(@search_ft) = 0
-            SET @busqueda_vacia = 1;
-    END;
 
     SELECT
         f.id,
@@ -563,75 +543,25 @@ BEGIN
         INNER JOIN PERIODO_GEOLOGICO  pg ON f.periodo_id   = pg.id
         INNER JOIN CANTON              c ON f.canton_id    = c.id
         INNER JOIN PROVINCIA          pv ON c.provincia_id = pv.id
-        LEFT  JOIN TAXONOMIA           t ON f.taxonomia_id = t.id
     WHERE
         f.deleted_at IS NULL
         AND (@solo_publico = 0 OR f.estado = 'publicado')
-        AND (@nombre IS NULL OR @busqueda_vacia = 0)
         AND (
             @nombre IS NULL
             OR (
                 @modo_busqueda = 0
                 AND (
-                    CONTAINS((
-                        f.nombre,
-                        f.descripcion_general,
-                        f.descripcion_detallada,
-                        f.descripcion_estado_orig,
-                        f.contexto_geologico,
-                        f.descripcion_ubicacion,
-                        f.notas_revision
-                    ), @search_ft)
-                    OR (
-                        t.id IS NOT NULL
-                        AND CONTAINS((
-                            t.reino, t.filo, t.clase, t.orden, t.familia, t.genero, t.especie
-                        ), @search_ft)
-                    )
+                    CONTAINS(f.nombre, @nombre)
+                    OR CONTAINS(f.descripcion_general, @nombre)
+                    OR (f.descripcion_detallada IS NOT NULL AND CONTAINS(f.descripcion_detallada, @nombre))
                 )
             )
             OR (
                 @modo_busqueda = 1
                 AND (
-                    FREETEXT((
-                        f.nombre,
-                        f.descripcion_general,
-                        f.descripcion_detallada,
-                        f.descripcion_estado_orig,
-                        f.contexto_geologico,
-                        f.descripcion_ubicacion,
-                        f.notas_revision
-                    ), @search_ft)
-                    OR (
-                        t.id IS NOT NULL
-                        AND FREETEXT((
-                            t.reino, t.filo, t.clase, t.orden, t.familia, t.genero, t.especie
-                        ), @search_ft)
-                    )
-                )
-            )
-            OR (
-                @modo_busqueda = 2
-                AND (
-                    CHARINDEX(@nombre, f.nombre) > 0
-                    OR CHARINDEX(@nombre, f.descripcion_general) > 0
-                    OR (f.descripcion_detallada IS NOT NULL AND CHARINDEX(@nombre, f.descripcion_detallada) > 0)
-                    OR (f.descripcion_estado_orig IS NOT NULL AND CHARINDEX(@nombre, f.descripcion_estado_orig) > 0)
-                    OR (f.contexto_geologico IS NOT NULL AND CHARINDEX(@nombre, f.contexto_geologico) > 0)
-                    OR (f.descripcion_ubicacion IS NOT NULL AND CHARINDEX(@nombre, f.descripcion_ubicacion) > 0)
-                    OR (f.notas_revision IS NOT NULL AND CHARINDEX(@nombre, f.notas_revision) > 0)
-                    OR (
-                        t.id IS NOT NULL
-                        AND (
-                            CHARINDEX(@nombre, t.reino) > 0
-                            OR CHARINDEX(@nombre, t.filo) > 0
-                            OR CHARINDEX(@nombre, t.clase) > 0
-                            OR CHARINDEX(@nombre, t.orden) > 0
-                            OR CHARINDEX(@nombre, t.familia) > 0
-                            OR CHARINDEX(@nombre, t.genero) > 0
-                            OR CHARINDEX(@nombre, t.especie) > 0
-                        )
-                    )
+                    FREETEXT(f.nombre, @nombre)
+                    OR FREETEXT(f.descripcion_general, @nombre)
+                    OR (f.descripcion_detallada IS NOT NULL AND FREETEXT(f.descripcion_detallada, @nombre))
                 )
             )
         )
@@ -919,4 +849,26 @@ BEGIN
 END
 GO
 
--- Full-Text: catalogo e indices en 00_fulltext_setup.sql (ejecutar despues de 02_tablas_principales.sql).
+-- Full-Text: el catalogo y el index de FOSIL ya fueron creados antes de ejecutar este script.
+-- Solo creamos el Full-Text Index de TAXONOMIA si no existe aun.
+
+IF NOT EXISTS (
+    SELECT 1 FROM sys.fulltext_indexes
+    WHERE object_id = OBJECT_ID('dbo.TAXONOMIA')
+)
+BEGIN
+    CREATE FULLTEXT INDEX ON TAXONOMIA
+    (
+        reino,
+        filo,
+        clase,
+        orden,
+        familia,
+        genero,
+        especie
+    )
+    KEY INDEX PK_TAXONOMIA
+    ON FosilesCatalog
+    WITH STOPLIST = SYSTEM, CHANGE_TRACKING AUTO;
+END
+GO
