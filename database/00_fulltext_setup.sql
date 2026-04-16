@@ -1,34 +1,46 @@
 USE FosilesDB;
 GO
 
--- Crear el catalogo Full-Text
-CREATE FULLTEXT CATALOG FosilesCatalog AS DEFAULT;
+IF NOT EXISTS (SELECT 1 FROM sys.fulltext_catalogs WHERE name = N'FosilesCatalog')
+BEGIN
+    CREATE FULLTEXT CATALOG FosilesCatalog AS DEFAULT;
+END
 GO
 
--- Crear el Full-Text Index en la tabla FOSIL
-CREATE FULLTEXT INDEX ON FOSIL(
-    nombre,
-    descripcion_general,
-    descripcion_detallada,
-    descripcion_estado_orig,
-    contexto_geologico,
-    descripcion_ubicacion,
-    notas_revision
+IF NOT EXISTS (
+    SELECT 1 FROM sys.fulltext_indexes WHERE object_id = OBJECT_ID(N'dbo.FOSIL', N'U')
 )
-KEY INDEX PK_FOSIL
-ON FosilesCatalog;
+BEGIN
+    CREATE FULLTEXT INDEX ON FOSIL (
+        nombre,
+        descripcion_general,
+        descripcion_detallada,
+        descripcion_estado_orig,
+        contexto_geologico,
+        descripcion_ubicacion,
+        notas_revision
+    )
+    KEY INDEX PK_FOSIL
+    ON FosilesCatalog
+    WITH STOPLIST = SYSTEM, CHANGE_TRACKING AUTO;
+END
 GO
 
--- Crear el Full-Text Index en la tabla TAXONOMIA
-CREATE FULLTEXT INDEX ON TAXONOMIA(
-    reino,
-    filo,
-    clase,
-    orden,
-    familia,
-    genero,
-    especie
+IF NOT EXISTS (
+    SELECT 1 FROM sys.fulltext_indexes WHERE object_id = OBJECT_ID(N'dbo.TAXONOMIA', N'U')
 )
-KEY INDEX PK_TAXONOMIA
-ON FosilesCatalog;
+BEGIN
+    CREATE FULLTEXT INDEX ON TAXONOMIA (
+        reino,
+        filo,
+        clase,
+        orden,
+        familia,
+        genero,
+        especie
+    )
+    KEY INDEX PK_TAXONOMIA
+    ON FosilesCatalog
+    WITH STOPLIST = SYSTEM, CHANGE_TRACKING AUTO;
+END
 GO
