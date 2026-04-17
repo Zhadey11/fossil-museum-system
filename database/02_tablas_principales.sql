@@ -1,8 +1,6 @@
 USE FosilesDB;
 GO
 
-
--- Cuentas: rol_id -> ROL; soft delete con deleted_at
 CREATE TABLE USUARIO (
     id             INT          NOT NULL IDENTITY(1,1),
     rol_id         INT          NOT NULL,
@@ -25,7 +23,6 @@ CREATE TABLE USUARIO (
 );
 GO
 
--- Registro principal: explorador = quien carga; admin opcional en aprobacion
 CREATE TABLE FOSIL (
     id                       INT           NOT NULL IDENTITY(1,1),
     codigo_unico             VARCHAR(30)   NOT NULL,
@@ -56,12 +53,12 @@ CREATE TABLE FOSIL (
     CONSTRAINT PK_FOSIL          PRIMARY KEY (id),
     CONSTRAINT UQ_FOSIL_codigo   UNIQUE (codigo_unico),
     CONSTRAINT UQ_FOSIL_slug     UNIQUE (slug),
-    CONSTRAINT FK_FOSIL_CANTON   FOREIGN KEY (canton_id)   REFERENCES CANTON(id),
-    CONSTRAINT FK_FOSIL_CAT      FOREIGN KEY (categoria_id) REFERENCES CATEGORIA_FOSIL(id),
-    CONSTRAINT FK_FOSIL_ERA      FOREIGN KEY (era_id)       REFERENCES ERA_GEOLOGICA(id),
-    CONSTRAINT FK_FOSIL_PERIODO  FOREIGN KEY (periodo_id)   REFERENCES PERIODO_GEOLOGICO(id),
-    CONSTRAINT FK_FOSIL_TAX      FOREIGN KEY (taxonomia_id) REFERENCES TAXONOMIA(id),
-    CONSTRAINT FK_FOSIL_EXPLOR   FOREIGN KEY (explorador_id)   REFERENCES USUARIO(id),
+    CONSTRAINT FK_FOSIL_CANTON   FOREIGN KEY (canton_id)        REFERENCES CANTON(id),
+    CONSTRAINT FK_FOSIL_CAT      FOREIGN KEY (categoria_id)     REFERENCES CATEGORIA_FOSIL(id),
+    CONSTRAINT FK_FOSIL_ERA      FOREIGN KEY (era_id)           REFERENCES ERA_GEOLOGICA(id),
+    CONSTRAINT FK_FOSIL_PERIODO  FOREIGN KEY (periodo_id)       REFERENCES PERIODO_GEOLOGICO(id),
+    CONSTRAINT FK_FOSIL_TAX      FOREIGN KEY (taxonomia_id)     REFERENCES TAXONOMIA(id),
+    CONSTRAINT FK_FOSIL_EXPLOR   FOREIGN KEY (explorador_id)    REFERENCES USUARIO(id),
     CONSTRAINT FK_FOSIL_ADMIN    FOREIGN KEY (administrador_id) REFERENCES USUARIO(id),
     CONSTRAINT CK_FOSIL_estado   CHECK (estado IN ('pendiente','publicado','rechazado','en_revision')),
     CONSTRAINT CK_FOSIL_coords   CHECK (
@@ -71,7 +68,6 @@ CREATE TABLE FOSIL (
 );
 GO
 
--- periodo_id debe pertenecer a era_id (coherencia geologica)
 CREATE TRIGGER TRG_FOSIL_validar_era_periodo
 ON FOSIL
 AFTER INSERT, UPDATE
@@ -90,7 +86,6 @@ BEGIN
 END;
 GO
 
--- Archivos por ficha; deleted_at = baja logica (excluir en vistas)
 CREATE TABLE MULTIMEDIA (
     id             INT          NOT NULL IDENTITY(1,1),
     fosil_id       INT          NOT NULL,
@@ -106,15 +101,14 @@ CREATE TABLE MULTIMEDIA (
     es_principal   BIT          NOT NULL DEFAULT 0,
     orden          INT          NOT NULL DEFAULT 0,
     created_at     DATETIME2    NOT NULL DEFAULT GETDATE(),
-    deleted_at     DATETIME2     NULL,
-    CONSTRAINT PK_MULTIMEDIA     PRIMARY KEY (id),
-    CONSTRAINT FK_MULTI_FOSIL    FOREIGN KEY (fosil_id) REFERENCES FOSIL(id),
-    CONSTRAINT CK_MULTI_tipo     CHECK (tipo    IN ('imagen','video')),
-    CONSTRAINT CK_MULTI_subtipo  CHECK (subtipo IN ('antes','despues','analisis','general','portada'))
+    deleted_at     DATETIME2    NULL,
+    CONSTRAINT PK_MULTIMEDIA    PRIMARY KEY (id),
+    CONSTRAINT FK_MULTI_FOSIL   FOREIGN KEY (fosil_id) REFERENCES FOSIL(id),
+    CONSTRAINT CK_MULTI_tipo    CHECK (tipo    IN ('imagen','video')),
+    CONSTRAINT CK_MULTI_subtipo CHECK (subtipo IN ('antes','despues','analisis','general','portada'))
 );
 GO
 
--- Estudio vinculado a ficha e investigador (usuario); deleted_at = baja logica
 CREATE TABLE ESTUDIO_CIENTIFICO (
     id                     INT          NOT NULL IDENTITY(1,1),
     fosil_id               INT          NOT NULL,
@@ -137,7 +131,6 @@ CREATE TABLE ESTUDIO_CIENTIFICO (
 );
 GO
 
--- Bibliografia por estudio (CASCADE si se borra estudio fisicamente)
 CREATE TABLE REFERENCIA_ESTUDIO (
     id         INT          NOT NULL IDENTITY(1,1),
     estudio_id INT          NOT NULL,
@@ -147,13 +140,12 @@ CREATE TABLE REFERENCIA_ESTUDIO (
     autores    VARCHAR(500) NULL,
     anio       INT          NULL,
     created_at DATETIME2    NOT NULL DEFAULT GETDATE(),
-    CONSTRAINT PK_REFERENCIA     PRIMARY KEY (id),
-    CONSTRAINT FK_REF_ESTUDIO    FOREIGN KEY (estudio_id) REFERENCES ESTUDIO_CIENTIFICO(id) ON DELETE CASCADE,
-    CONSTRAINT CK_REF_tipo       CHECK (tipo IN ('enlace','articulo','libro','tesis','informe','doi'))
+    CONSTRAINT PK_REFERENCIA  PRIMARY KEY (id),
+    CONSTRAINT FK_REF_ESTUDIO FOREIGN KEY (estudio_id) REFERENCES ESTUDIO_CIENTIFICO(id) ON DELETE CASCADE,
+    CONSTRAINT CK_REF_tipo    CHECK (tipo IN ('enlace','articulo','libro','tesis','informe','doi'))
 );
 GO
 
--- Formulario web publico (sin FK a usuario)
 CREATE TABLE CONTACTO (
     id         INT          NOT NULL IDENTITY(1,1),
     nombre     VARCHAR(200) NOT NULL,
@@ -169,7 +161,6 @@ CREATE TABLE CONTACTO (
 );
 GO
 
--- Trazas: accion segun CK; UPDATE_FOSIL lo rellena trigger o SPs
 CREATE TABLE LOG_AUDITORIA (
     id               INT           NOT NULL IDENTITY(1,1),
     usuario_id       INT           NULL,
@@ -189,7 +180,6 @@ CREATE TABLE LOG_AUDITORIA (
 );
 GO
 
--- Log de cambios en FOSIL (usuario vía SESSION_CONTEXT audit_user_id; omitir con skip_fosil_update_audit)
 CREATE TRIGGER TRG_FOSIL_auditoria_UPDATE
 ON FOSIL
 AFTER UPDATE
@@ -209,8 +199,7 @@ BEGIN
             SELECT
                 d.id, d.codigo_unico, d.canton_id, d.categoria_id, d.era_id, d.periodo_id,
                 d.taxonomia_id, d.nombre, d.slug, d.estado, d.latitud, d.longitud, d.altitud_msnm,
-                d.descripcion_general,
-                d.descripcion_detallada
+                d.descripcion_general, d.descripcion_detallada
             FROM deleted d
             WHERE d.id = i.id
             FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
@@ -219,8 +208,7 @@ BEGIN
             SELECT
                 i2.id, i2.codigo_unico, i2.canton_id, i2.categoria_id, i2.era_id, i2.periodo_id,
                 i2.taxonomia_id, i2.nombre, i2.slug, i2.estado, i2.latitud, i2.longitud, i2.altitud_msnm,
-                i2.descripcion_general,
-                i2.descripcion_detallada
+                i2.descripcion_general, i2.descripcion_detallada
             FROM inserted i2
             WHERE i2.id = i.id
             FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
@@ -228,4 +216,17 @@ BEGIN
     FROM inserted i
     INNER JOIN deleted del ON del.id = i.id;
 END;
+GO
+
+CREATE TABLE USUARIO_ROL (
+    id         INT       NOT NULL IDENTITY(1,1),
+    usuario_id INT       NOT NULL,
+    rol_id     INT       NOT NULL,
+    activo     BIT       NOT NULL DEFAULT 1,
+    created_at DATETIME2 NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT PK_USUARIO_ROL  PRIMARY KEY (id),
+    CONSTRAINT UQ_USUARIO_ROL  UNIQUE (usuario_id, rol_id),
+    CONSTRAINT FK_USUROL_USR   FOREIGN KEY (usuario_id) REFERENCES USUARIO(id),
+    CONSTRAINT FK_USUROL_ROL   FOREIGN KEY (rol_id)     REFERENCES ROL(id)
+);
 GO

@@ -8,7 +8,6 @@ INSERT INTO ROL (nombre, descripcion) VALUES
 ('publico',       'Acceso de solo lectura a la informacion publica del catalogo.');
 GO
 
--- Paises y jerarquia geografica (ids usados en cantones)
 INSERT INTO PAIS (codigo_iso, nombre) VALUES
 ('CRI','Costa Rica'),('PAN','Panama'),('NIC','Nicaragua'),('HND','Honduras'),
 ('GTM','Guatemala'),('SLV','El Salvador'),('MEX','Mexico'),('COL','Colombia'),
@@ -29,12 +28,11 @@ INSERT INTO CANTON (provincia_id, codigo, nombre) VALUES
 (1,'TAR','Tarrazu'),(2,'ALC','Alajuela Centro'),(2,'SRM','San Ramon'),
 (2,'GRE','Grecia'),(2,'SCA','San Carlos'),(3,'CAC','Cartago Centro'),
 (3,'TUR','Turrialba'),(3,'PAR','Paraiso'),(4,'HEC','Heredia Centro'),
-(4,'SJM','San Jose Montaña'),(5,'LIB','Liberia'),(5,'NIC','Nicoya'),
+(4,'SJM','San Jose Montana'),(5,'LIB','Liberia'),(5,'NIC','Nicoya'),
 (5,'SCR','Santa Cruz'),(6,'PNC','Puntarenas Centro'),(6,'OSA','Osa'),
 (7,'LMC','Limon Centro'),(7,'TAL','Talamanca'),(7,'MAT','Matina');
 GO
 
--- Tipos de hallazgo (FOS, MIN, ROC, PAL)
 INSERT INTO CATEGORIA_FOSIL (codigo, nombre, descripcion) VALUES
 ('FOS','Fosil General',           'Restos o trazas de organismos del pasado geologico no clasificados en categorias especificas.'),
 ('MIN','Mineral',                  'Sustancias inorganicas naturales con composicion quimica y estructura cristalina definida.'),
@@ -42,7 +40,6 @@ INSERT INTO CATEGORIA_FOSIL (codigo, nombre, descripcion) VALUES
 ('PAL','Paleontologico Especifico','Fosiles con valor cientifico excepcional que requieren estudio paleontologico especializado.');
 GO
 
--- Eras (Ma = millones de años; inicio > fin)
 INSERT INTO ERA_GEOLOGICA (nombre, descripcion, ma_inicio, ma_fin) VALUES
 ('Hadeico',     'Periodo mas antiguo, antes de los primeros registros rocosos conocidos.',                               4600,4000),
 ('Arcaico',     'Primeras rocas estables. Aparicion de los primeros microorganismos procariontes.',                      4000,2500),
@@ -52,7 +49,6 @@ INSERT INTO ERA_GEOLOGICA (nombre, descripcion, ma_inicio, ma_fin) VALUES
 ('Cenozoico',   'Era actual. Diversificacion de mamiferos. Evolucion de primates hasta Homo sapiens.',                   66,0);
 GO
 
--- Periodos ligados a era_id (3=Proterozoico, 4=Paleozoico, ...)
 INSERT INTO PERIODO_GEOLOGICO (era_id, nombre, descripcion, ma_inicio, ma_fin) VALUES
 (4,'Cambrico',    'Explosion de la vida multicelular. Aparicion de la mayoria de filos animales.',              541,485),
 (4,'Ordovicico',  'Diversificacion marina masiva. Primera extincion masiva al final.',                          485,443),
@@ -71,7 +67,6 @@ INSERT INTO PERIODO_GEOLOGICO (era_id, nombre, descripcion, ma_inicio, ma_fin) V
 (3,'Toniano',     'Ruptura del supercontinente Rodinia.',                                                       1000,720);
 GO
 
--- Clasificacion cientifica (FOSIL.taxonomia_id opcional)
 INSERT INTO TAXONOMIA (reino, filo, clase, orden, familia, genero, especie) VALUES
 ('Animalia','Chordata','Reptilia','Saurischia','Tyrannosauridae','Tyrannosaurus','Tyrannosaurus rex'),
 ('Animalia','Chordata','Reptilia','Ornithischia','Hadrosauridae','Edmontosaurus','Edmontosaurus regalis'),
@@ -91,30 +86,39 @@ INSERT INTO TAXONOMIA (reino, filo, clase, orden, familia, genero, especie) VALU
 ('Animalia','Chordata','Reptilia','Crocodilia','Crocodylidae','Crocodylus','Crocodylus acutus');
 GO
 
--- Hash demo para login (sustituir por esquema real en produccion)
 DECLARE @h VARCHAR(255) = 'pbkdf2_sha256$720000$dev$hash_placeholder';
 
 INSERT INTO USUARIO (rol_id,nombre,apellido,email,password_hash,telefono,pais,profesion,centro_trabajo) VALUES
-(1,'Carlos','Mendez Solano',     'admin@fosilesdb.net',   @h,'+506 8888-0001','Costa Rica','Administrador de Sistemas',  'Centro de Investigacion Geologica CIG'),
-(1,'Maria', 'Quesada Vargas',    'admin2@fosilesdb.net',  @h,'+506 8888-0002','Costa Rica','Gestora de Base de Datos',    'Centro de Investigacion Geologica CIG'),
-(2,'Jorge', 'Alvarado Campos',   'jalvarado@ucr.ac.cr',   @h,'+506 7777-0001','Costa Rica','Paleontologo',                'Universidad de Costa Rica'),
-(2,'Ana',   'Fonseca Bermudez',  'afonseca@tec.ac.cr',    @h,'+506 7777-0002','Costa Rica','Geologa Investigadora',       'Instituto Tecnologico de Costa Rica'),
-(2,'Luis',  'Mora Rodriguez',    'lmora@una.ac.cr',       @h,'+506 7777-0003','Costa Rica','Biologo Evolutivo',           'Universidad Nacional de Costa Rica'),
-(2,'Sofia', 'Perez Gutierrez',   'sperez@up.edu.pa',      @h,'+507 6666-0001','Panama',    'Paleontologa Marina',         'Universidad de Panama'),
-(2,'Marco', 'Urena Zamora',      'murena@ucr.ac.cr',      @h,'+506 7777-0004','Costa Rica','Geologo Estratigrafo',        'Universidad de Costa Rica'),
-(2,'Elena', 'Castillo Porras',   'ecastillo@una.ac.cr',   @h,'+506 7777-0005','Costa Rica','Micropaleontologa',           'Universidad Nacional de Costa Rica'),
-(3,'Andres','Jimenez Lopez',     'ajimenez@gmail.com',    @h,'+506 6666-0001','Costa Rica','Guia de Montana',             'Freelance'),
-(3,'Karla', 'Sancho Herrera',    'ksancho@gmail.com',     @h,'+506 6666-0002','Costa Rica','Biologa de Campo',            'SINAC'),
-(3,'Rodrigo','Vargas Chaves',    'rvargas@gmail.com',     @h,'+506 6666-0003','Costa Rica','Geologo Junior',              'Centro de Investigacion Geologica CIG'),
-(3,'Valentina','Rojas Ulate',    'vrojas@gmail.com',      @h,'+506 6666-0004','Costa Rica','Estudiante Geologia',         'Universidad de Costa Rica'),
-(3,'Pablo', 'Cespedes Mora',     'pcespedes@gmail.com',   @h,'+506 6666-0005','Costa Rica','Naturalista',                 'Museo Nacional de Costa Rica'),
-(3,'Natalia','Esquivel Diaz',    'nesquivel@gmail.com',   @h,'+506 6666-0006','Costa Rica','Arqueologa',                  'UCR Escuela de Antropologia'),
-(3,'Esteban','Mendez Arias',     'emendez@gmail.com',     @h,'+506 6666-0007','Costa Rica','Espeleologo',                 'Sociedad Espeleologica CR'),
-(3,'Adriana','Morera Vega',      'amorera@gmail.com',     @h,'+506 6666-0008','Costa Rica','Botanica',                    'CIBIO UCR'),
-(2,'Diana', 'Barrantes Rojas',   'dbarrantes@una.ac.cr',  @h,'+506 7777-0006','Costa Rica','Geoquimica',                  'Universidad Nacional de Costa Rica');
+(1,'Carlos',   'Mendez Solano',    'admin@fosilesdb.net',   @h,'+506 8888-0001','Costa Rica','Administrador de Sistemas', 'Centro de Investigacion Geologica CIG'),
+(1,'Maria',    'Quesada Vargas',   'admin2@fosilesdb.net',  @h,'+506 8888-0002','Costa Rica','Gestora de Base de Datos',  'Centro de Investigacion Geologica CIG'),
+(2,'Jorge',    'Alvarado Campos',  'jalvarado@ucr.ac.cr',   @h,'+506 7777-0001','Costa Rica','Paleontologo',              'Universidad de Costa Rica'),
+(2,'Ana',      'Fonseca Bermudez', 'afonseca@tec.ac.cr',    @h,'+506 7777-0002','Costa Rica','Geologa Investigadora',     'Instituto Tecnologico de Costa Rica'),
+(2,'Luis',     'Mora Rodriguez',   'lmora@una.ac.cr',       @h,'+506 7777-0003','Costa Rica','Biologo Evolutivo',         'Universidad Nacional de Costa Rica'),
+(2,'Sofia',    'Perez Gutierrez',  'sperez@up.edu.pa',      @h,'+507 6666-0001','Panama',    'Paleontologa Marina',       'Universidad de Panama'),
+(2,'Marco',    'Urena Zamora',     'murena@ucr.ac.cr',      @h,'+506 7777-0004','Costa Rica','Geologo Estratigrafo',      'Universidad de Costa Rica'),
+(2,'Elena',    'Castillo Porras',  'ecastillo@una.ac.cr',   @h,'+506 7777-0005','Costa Rica','Micropaleontologa',         'Universidad Nacional de Costa Rica'),
+(3,'Andres',   'Jimenez Lopez',    'ajimenez@gmail.com',    @h,'+506 6666-0001','Costa Rica','Guia de Montana',           'Freelance'),
+(3,'Karla',    'Sancho Herrera',   'ksancho@gmail.com',     @h,'+506 6666-0002','Costa Rica','Biologa de Campo',          'SINAC'),
+(3,'Rodrigo',  'Vargas Chaves',    'rvargas@gmail.com',     @h,'+506 6666-0003','Costa Rica','Geologo Junior',            'Centro de Investigacion Geologica CIG'),
+(3,'Valentina','Rojas Ulate',      'vrojas@gmail.com',      @h,'+506 6666-0004','Costa Rica','Estudiante Geologia',       'Universidad de Costa Rica'),
+(3,'Pablo',    'Cespedes Mora',    'pcespedes@gmail.com',   @h,'+506 6666-0005','Costa Rica','Naturalista',               'Museo Nacional de Costa Rica'),
+(3,'Natalia',  'Esquivel Diaz',    'nesquivel@gmail.com',   @h,'+506 6666-0006','Costa Rica','Arqueologa',                'UCR Escuela de Antropologia'),
+(3,'Esteban',  'Mendez Arias',     'emendez@gmail.com',     @h,'+506 6666-0007','Costa Rica','Espeleologo',               'Sociedad Espeleologica CR'),
+(3,'Adriana',  'Morera Vega',      'amorera@gmail.com',     @h,'+506 6666-0008','Costa Rica','Botanica',                  'CIBIO UCR'),
+(2,'Diana',    'Barrantes Rojas',  'dbarrantes@una.ac.cr',  @h,'+506 7777-0006','Costa Rica','Geoquimica',                'Universidad Nacional de Costa Rica');
 GO
 
--- Fichas vía SP (orden de insercion = ids 1,2,3...); luego taxonomia por codigo
+INSERT INTO USUARIO_ROL (usuario_id, rol_id)
+SELECT u.id, u.rol_id
+FROM USUARIO u
+WHERE u.deleted_at IS NULL;
+GO
+
+EXEC sp_asignar_rol @usuario_id=3, @rol_nombre='explorador',   @admin_id=1;
+EXEC sp_asignar_rol @usuario_id=4, @rol_nombre='explorador',   @admin_id=1;
+EXEC sp_asignar_rol @usuario_id=5, @rol_nombre='explorador',   @admin_id=1;
+GO
+
 DECLARE @id INT, @cod VARCHAR(30);
 
 EXEC sp_registrar_fosil 10,4,5,9,9,'Diente de Mosasaurio del Valle de Turrialba','Diente conico bien preservado de un mosasaurio marino. Hallado en afloramientos de lutita calcarea del Cretacico Superior en las laderas del Valle de Turrialba.',9.9008,-83.6780,NULL,NULL,'2024-03-15',@id OUTPUT,@cod OUTPUT;
@@ -165,7 +169,6 @@ EXEC sp_registrar_fosil 1,1,6,12,16,'Posible Hueso de Megafauna Pleistocenica','
 EXEC sp_cambiar_estado_fosil @id,'rechazado',1,'El especimen no presenta caracteristicas diagnosticas suficientes para una clasificacion confiable.';
 GO
 
--- Enlaces taxonomicos por codigo generado
 UPDATE FOSIL SET taxonomia_id = 9  WHERE codigo_unico LIKE 'CRI-CAR-TUR-PAL-00001';
 UPDATE FOSIL SET taxonomia_id = 3  WHERE codigo_unico LIKE 'CRI-LIM-TAL-PAL-00001';
 UPDATE FOSIL SET taxonomia_id = 7  WHERE codigo_unico LIKE 'CRI-ALA-SCA-FOS-00001';
@@ -176,9 +179,8 @@ UPDATE FOSIL SET taxonomia_id = 6  WHERE codigo_unico LIKE 'CRI-CAR-CAC-FOS-0000
 UPDATE FOSIL SET taxonomia_id = 11 WHERE codigo_unico LIKE 'CRI-GUA-SCR-PAL-00001';
 GO
 
--- URLs de ejemplo (almacenamiento real en app/API)
 INSERT INTO MULTIMEDIA (fosil_id,tipo,subtipo,url,nombre_archivo,angulo,descripcion,es_principal,orden)
-SELECT f.id,'imagen','portada', '/media/fosiles/f' + CAST(f.id AS VARCHAR) + '/portada.webp',
+SELECT f.id,'imagen','portada','/media/fosiles/f' + CAST(f.id AS VARCHAR) + '/portada.webp',
     'portada.webp','frontal','Vista principal del especimen',1,1
 FROM FOSIL f WHERE f.deleted_at IS NULL AND f.estado IN ('publicado','en_revision');
 
@@ -193,7 +195,6 @@ SELECT f.id,'imagen','despues','/media/fosiles/f' + CAST(f.id AS VARCHAR) + '/de
 FROM FOSIL f WHERE f.deleted_at IS NULL AND f.estado = 'publicado';
 GO
 
--- Estudios (fosil_id 1..N segun orden de registro arriba)
 INSERT INTO ESTUDIO_CIENTIFICO (fosil_id,investigador_id,titulo,contexto_objetivo,tipo_analisis,resultados,composicion,condiciones_hallazgo,publicado)
 VALUES
 (1,3,'Analisis morfologico de diente de Mosasaurio de Turrialba',
@@ -232,7 +233,6 @@ VALUES
  'Lente calcareo de 30 cm en zona de contacto metamorfico. Temperatura estimada de metamorfismo: 200 grados.',1);
 GO
 
--- Referencias por estudio_id (1..5 segun filas anteriores)
 INSERT INTO REFERENCIA_ESTUDIO (estudio_id,titulo,url,tipo,autores,anio) VALUES
 (1,'Mosasaur distribution in the Late Cretaceous of Central America','https://doi.org/10.1016/j.cretres.2019.104234','doi','Polcyn M.J., Bell G.L.',2019),
 (1,'Geologia del Cretacico Superior de Turrialba','https://revistas.ucr.ac.cr/index.php/geologica/article/view/001','articulo','Denyer P., Arias O.',2020),
@@ -251,39 +251,38 @@ INSERT INTO REFERENCIA_ESTUDIO (estudio_id,titulo,url,tipo,autores,anio) VALUES
 (3,'Cambrian Fauna of the Pacific Realm','https://doi.org/10.1080/14772019.2020.1838879','doi','Zhang X., Shu D.',2020);
 GO
 
--- Mensajes web de demostracion
 INSERT INTO CONTACTO (nombre,email,asunto,mensaje,leido,respondido) VALUES
-('Profesora Andrea Solano',    'asolano@escola.ed.cr',    'Visita educativa al museo digital',         'Soy docente de Ciencias y me gustaria organizar una actividad virtual con mi grupo de Biologia usando el catalogo.',1,1),
-('Roberto Chaves Mora',        'rchaves@gmail.com',        'Hallazgo en Perez Zeledon',                 'Encontre un objeto que parece ser un fosil mientras hacia senderismo. Como puedo reportarlo oficialmente? Tengo fotos.',1,0),
-('Museo Nacional de Panama',   'contacto@museopanama.gob.pa','Solicitud de colaboracion institucional', 'Estamos interesados en establecer un convenio de colaboracion e intercambio de datos sobre fosiles del Caribe.',1,1),
-('Giovanna Picado',            'gpicado@ucr.ac.cr',        'Acceso para tesis doctoral',                'Soy estudiante del Doctorado en Geologia de la UCR. Mi investigacion es sobre paleobiogeografia del Cretacico. Como obtengo acceso?',0,0),
-('Augusto Fernandez',          'augfg@yahoo.es',           'Error en descripcion del fosil',            'Al revisar la ficha del diente de mosasaurio, las coordenadas no corresponden con la ubicacion descrita. Favor verificar.',1,1),
-('Colegio Cientifico Heredia', 'info@ccheredia.ed.cr',     'Permiso uso de imagenes',                   'Deseamos incorporar imagenes del catalogo en nuestra revista estudiantil de ciencias. Cuales son los terminos de uso?',0,0),
-('William Aguilar',            'waguilar@petro.com',       'Consulta sobre patrimonio',                 'Nuestro equipo realiza prospeccion geologica en Guanacaste. Cual es el protocolo para reportar hallazgos fosiles?',1,0),
-('Valentina Morales',          'vmorales@uned.ac.cr',      'Solicitud datos para investigacion',        'Soy investigadora de la UNED. Necesito acceder a datos de clasificacion taxonomica para comparar con registros del Pacifico Sur.',0,0),
-('Carlos Seas Amador',         'cseas@itcr.ac.cr',         'Propuesta de mejora del sistema',           'El sistema es excelente. Sugiero agregar una linea de tiempo interactiva para visualizar fosiles por periodo geologico.',1,0),
-('Ana Lucia Perez',            'alperez@gmail.com',        'Pregunta general sobre fosiles',            'Es normal encontrar fosiles en las playas del Pacifico? El mes pasado en Playa Hermosa encontre algo que parece un diente.',1,0),
-('Prof. Marco Solano',         'msolano@unibe.ac.cr',      'Acceso institucional UNIBE',                'Soy director del Departamento de Biologia de UNIBE. Nos interesa incorporar el catalogo en nuestros cursos de Paleontologia.',0,0),
-('Revista Geologia Tropical',  'editor@revgeo.ucr.ac.cr',  'Publicacion de hallazgos',                  'Estamos interesados en recibir articulos basados en los hallazgos documentados. Tienen investigadores interesados en publicar?',1,1),
-('Ministerio de Educacion CR', 'dgec@mep.go.cr',           'Integracion con plataforma MEP',            'Exploramos recursos digitales de ciencias para secundaria. El catalogo es un excelente candidato para integrar a nuestros recursos.',1,0),
-('Luisa Arrieta',              'larrietab@gmail.com',      'Foto que quiero compartir',                 'Encontre un fosil en Turrialba hace anos y tome muchas fotos. Hay manera de contribuir con imagenes aunque no sea investigadora?',0,0),
-('Fundacion Neotropica',       'info@neotropica.org',      'Colaboracion en conservacion',              'Queremos explorar sinergias entre conservacion de patrimonio natural y el registro paleontologico. Podemos agendar reunion?',1,0);
+('Profesora Andrea Solano',    'asolano@escola.ed.cr',      'Visita educativa al museo digital',         'Soy docente de Ciencias y me gustaria organizar una actividad virtual con mi grupo de Biologia usando el catalogo.',1,1),
+('Roberto Chaves Mora',        'rchaves@gmail.com',          'Hallazgo en Perez Zeledon',                 'Encontre un objeto que parece ser un fosil mientras hacia senderismo. Como puedo reportarlo oficialmente? Tengo fotos.',1,0),
+('Museo Nacional de Panama',   'contacto@museopanama.gob.pa','Solicitud de colaboracion institucional',   'Estamos interesados en establecer un convenio de colaboracion e intercambio de datos sobre fosiles del Caribe.',1,1),
+('Giovanna Picado',            'gpicado@ucr.ac.cr',          'Acceso para tesis doctoral',                'Soy estudiante del Doctorado en Geologia de la UCR. Mi investigacion es sobre paleobiogeografia del Cretacico. Como obtengo acceso?',0,0),
+('Augusto Fernandez',          'augfg@yahoo.es',             'Error en descripcion del fosil',            'Al revisar la ficha del diente de mosasaurio, las coordenadas no corresponden con la ubicacion descrita. Favor verificar.',1,1),
+('Colegio Cientifico Heredia', 'info@ccheredia.ed.cr',       'Permiso uso de imagenes',                   'Deseamos incorporar imagenes del catalogo en nuestra revista estudiantil de ciencias. Cuales son los terminos de uso?',0,0),
+('William Aguilar',            'waguilar@petro.com',         'Consulta sobre patrimonio',                 'Nuestro equipo realiza prospeccion geologica en Guanacaste. Cual es el protocolo para reportar hallazgos fosiles?',1,0),
+('Valentina Morales',          'vmorales@uned.ac.cr',        'Solicitud datos para investigacion',        'Soy investigadora de la UNED. Necesito acceder a datos de clasificacion taxonomica para comparar con registros del Pacifico Sur.',0,0),
+('Carlos Seas Amador',         'cseas@itcr.ac.cr',           'Propuesta de mejora del sistema',           'El sistema es excelente. Sugiero agregar una linea de tiempo interactiva para visualizar fosiles por periodo geologico.',1,0),
+('Ana Lucia Perez',            'alperez@gmail.com',          'Pregunta general sobre fosiles',            'Es normal encontrar fosiles en las playas del Pacifico? El mes pasado en Playa Hermosa encontre algo que parece un diente.',1,0),
+('Prof. Marco Solano',         'msolano@unibe.ac.cr',        'Acceso institucional UNIBE',                'Soy director del Departamento de Biologia de UNIBE. Nos interesa incorporar el catalogo en nuestros cursos de Paleontologia.',0,0),
+('Revista Geologia Tropical',  'editor@revgeo.ucr.ac.cr',    'Publicacion de hallazgos',                  'Estamos interesados en recibir articulos basados en los hallazgos documentados. Tienen investigadores interesados en publicar?',1,1),
+('Ministerio de Educacion CR', 'dgec@mep.go.cr',             'Integracion con plataforma MEP',            'Exploramos recursos digitales de ciencias para secundaria. El catalogo es un excelente candidato para integrar a nuestros recursos.',1,0),
+('Luisa Arrieta',              'larrietab@gmail.com',        'Foto que quiero compartir',                 'Encontre un fosil en Turrialba hace anos y tome muchas fotos. Hay manera de contribuir con imagenes aunque no sea investigadora?',0,0),
+('Fundacion Neotropica',       'info@neotropica.org',        'Colaboracion en conservacion',              'Queremos explorar sinergias entre conservacion de patrimonio natural y el registro paleontologico. Podemos agendar reunion?',1,0);
 GO
 
--- Resumen de conteos por tabla
-SELECT 'ROL'               AS tabla, COUNT(*) AS registros FROM ROL                UNION ALL
-SELECT 'PAIS',                        COUNT(*)             FROM PAIS               UNION ALL
-SELECT 'PROVINCIA',                   COUNT(*)             FROM PROVINCIA          UNION ALL
-SELECT 'CANTON',                      COUNT(*)             FROM CANTON             UNION ALL
-SELECT 'CATEGORIA_FOSIL',             COUNT(*)             FROM CATEGORIA_FOSIL    UNION ALL
-SELECT 'ERA_GEOLOGICA',               COUNT(*)             FROM ERA_GEOLOGICA      UNION ALL
-SELECT 'PERIODO_GEOLOGICO',           COUNT(*)             FROM PERIODO_GEOLOGICO  UNION ALL
-SELECT 'TAXONOMIA',                   COUNT(*)             FROM TAXONOMIA          UNION ALL
-SELECT 'USUARIO',                     COUNT(*)             FROM USUARIO            UNION ALL
-SELECT 'FOSIL',                       COUNT(*)             FROM FOSIL              UNION ALL
-SELECT 'MULTIMEDIA',                  COUNT(*)             FROM MULTIMEDIA         UNION ALL
-SELECT 'ESTUDIO_CIENTIFICO',          COUNT(*)             FROM ESTUDIO_CIENTIFICO UNION ALL
-SELECT 'REFERENCIA_ESTUDIO',          COUNT(*)             FROM REFERENCIA_ESTUDIO UNION ALL
-SELECT 'CONTACTO',                    COUNT(*)             FROM CONTACTO
+SELECT 'ROL'          AS tabla, COUNT(*) AS registros FROM ROL               UNION ALL
+SELECT 'PAIS',                  COUNT(*)              FROM PAIS              UNION ALL
+SELECT 'PROVINCIA',             COUNT(*)              FROM PROVINCIA         UNION ALL
+SELECT 'CANTON',                COUNT(*)              FROM CANTON            UNION ALL
+SELECT 'CATEGORIA_FOSIL',       COUNT(*)              FROM CATEGORIA_FOSIL   UNION ALL
+SELECT 'ERA_GEOLOGICA',         COUNT(*)              FROM ERA_GEOLOGICA      UNION ALL
+SELECT 'PERIODO_GEOLOGICO',     COUNT(*)              FROM PERIODO_GEOLOGICO  UNION ALL
+SELECT 'TAXONOMIA',             COUNT(*)              FROM TAXONOMIA          UNION ALL
+SELECT 'USUARIO',               COUNT(*)              FROM USUARIO            UNION ALL
+SELECT 'USUARIO_ROL',           COUNT(*)              FROM USUARIO_ROL        UNION ALL
+SELECT 'FOSIL',                 COUNT(*)              FROM FOSIL              UNION ALL
+SELECT 'MULTIMEDIA',            COUNT(*)              FROM MULTIMEDIA         UNION ALL
+SELECT 'ESTUDIO_CIENTIFICO',    COUNT(*)              FROM ESTUDIO_CIENTIFICO UNION ALL
+SELECT 'REFERENCIA_ESTUDIO',    COUNT(*)              FROM REFERENCIA_ESTUDIO UNION ALL
+SELECT 'CONTACTO',              COUNT(*)              FROM CONTACTO
 ORDER BY tabla;
 GO
