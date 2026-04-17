@@ -5,6 +5,25 @@ import { GalleryCard } from "@/components/GalleryCard";
 import { HeroFossilSvg } from "@/components/HeroFossilSvg";
 import { Reveal } from "@/components/Reveal";
 import { mockFossils } from "@/data/mockFossils";
+import {
+  TIMELINE_BLOCKS,
+  type TimelineBlock,
+} from "@/data/timeline";
+
+function TimelineCardLink({ block }: { block: TimelineBlock }) {
+  return (
+    <Link
+      href={`/catalogo?era=${block.id}`}
+      className="tl-card"
+      aria-label={`Abrir el catálogo filtrado por ${block.eraLabel}`}
+    >
+      <p className="tl-era">{block.eraLabel}</p>
+      <h3 className="tl-name">{block.title}</h3>
+      <p className="tl-desc">{block.description}</p>
+      <span className="tl-card-cta">Explorar colección</span>
+    </Link>
+  );
+}
 
 const galleryVariants = [
   "tall",
@@ -52,7 +71,7 @@ export default function Home() {
             <Link href="/catalogo" className="btn-fill">
               Explorar colección
             </Link>
-            <Link href="#about" className="btn-out">
+            <Link href="/historia" className="btn-out">
               Nuestra historia
             </Link>
           </div>
@@ -152,17 +171,10 @@ export default function Home() {
             registro fósil para acercar el pasado profundo a visitantes y
             estudiantes.
           </p>
-          <p className="sec-body" style={{ marginTop: "1.2rem" }}>
-            La colección abarca desde los primeros organismos de complejidad
-            hasta los grandes gigantes del Mesozoico. Cada ficha es una página
-            de un mismo libro.
-          </p>
-          <div className="pullquote">
-            <p>
-              «El registro fósil es la única autobiografía que la Tierra ha
-              escrito.»
-            </p>
-            <cite>— Dra. Elena Marsh, directora fundadora</cite>
+          <div className="about-readmore">
+            <Link href="/historia" className="btn-fill">
+              Leer más
+            </Link>
           </div>
         </Reveal>
       </section>
@@ -177,7 +189,8 @@ export default function Home() {
             <div className="sec-rule" />
             <p className="sec-body" style={{ margin: "0 auto" }}>
               De la primera vida compleja a la última gran extinción: hitos del
-              planeta en un solo recorrido.
+              planeta en un solo recorrido. Pulsa un hito para abrir el catálogo
+              filtrado por era (demo).
             </p>
           </Reveal>
         </div>
@@ -185,77 +198,33 @@ export default function Home() {
         <div className="tl-wrap">
           <div className="tl-line" aria-hidden />
 
-          <Reveal className="tl-item">
-            <div className="tl-left">
-              <div className="tl-card">
-                <p className="tl-era">Período Cámbrico</p>
-                <h3 className="tl-name">La explosión de la vida</h3>
-                <p className="tl-desc">
-                  Aparecen casi todos los filos animales. Los trilobites
-                  dominan los mares poco profundos.
-                </p>
-              </div>
-            </div>
-            <div className="tl-mid">
-              <div className="tl-dot" />
-              <span className="tl-mya">541 Ma</span>
-            </div>
-            <div className="tl-right" />
-          </Reveal>
-
-          <Reveal className="tl-item">
-            <div className="tl-left" />
-            <div className="tl-mid">
-              <div className="tl-dot" />
-              <span className="tl-mya">419 Ma</span>
-            </div>
-            <div className="tl-right">
-              <div className="tl-card">
-                <p className="tl-era">Período Devónico</p>
-                <h3 className="tl-name">La edad de los peces</h3>
-                <p className="tl-desc">
-                  Los peces se diversifican; surgen los primeros bosques. La
-                  vida explora la costa.
-                </p>
-              </div>
-            </div>
-          </Reveal>
-
-          <Reveal className="tl-item">
-            <div className="tl-left">
-              <div className="tl-card">
-                <p className="tl-era">Período Jurásico</p>
-                <h3 className="tl-name">La era de los gigantes</h3>
-                <p className="tl-desc">
-                  Sauropodos y terópodos; los primeros pájaros surgen de linajes
-                  de dinosaurios emplumados.
-                </p>
-              </div>
-            </div>
-            <div className="tl-mid">
-              <div className="tl-dot" />
-              <span className="tl-mya">201 Ma</span>
-            </div>
-            <div className="tl-right" />
-          </Reveal>
-
-          <Reveal className="tl-item">
-            <div className="tl-left" />
-            <div className="tl-mid">
-              <div className="tl-dot" />
-              <span className="tl-mya">66 Ma</span>
-            </div>
-            <div className="tl-right">
-              <div className="tl-card">
-                <p className="tl-era">Fin del Cretácico</p>
-                <h3 className="tl-name">Antes del silencio</h3>
-                <p className="tl-desc">
-                  Un mundo de biodiversidad extraordinaria truncado por el
-                  impacto de Chicxulub.
-                </p>
-              </div>
-            </div>
-          </Reveal>
+          {TIMELINE_BLOCKS.map((block) => (
+            <Reveal key={block.id} className="tl-item">
+              {block.cardSide === "left" ? (
+                <>
+                  <div className="tl-left">
+                    <TimelineCardLink block={block} />
+                  </div>
+                  <div className="tl-mid">
+                    <div className="tl-dot" />
+                    <span className="tl-mya">{block.mya}</span>
+                  </div>
+                  <div className="tl-right" />
+                </>
+              ) : (
+                <>
+                  <div className="tl-left" />
+                  <div className="tl-mid">
+                    <div className="tl-dot" />
+                    <span className="tl-mya">{block.mya}</span>
+                  </div>
+                  <div className="tl-right">
+                    <TimelineCardLink block={block} />
+                  </div>
+                </>
+              )}
+            </Reveal>
+          ))}
         </div>
       </section>
 
