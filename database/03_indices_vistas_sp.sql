@@ -1,8 +1,6 @@
 ﻿USE FosilesDB;
 GO
 
--- Orden: 01_base_datos -> 02_tablas_principales -> 00_fulltext_setup.sql -> este archivo.
--- Eliminar indices si ya existen para poder recrearlos limpiamente
 DROP INDEX IF EXISTS IX_FOSIL_estado          ON FOSIL;
 DROP INDEX IF EXISTS IX_FOSIL_categoria_estado ON FOSIL;
 DROP INDEX IF EXISTS IX_FOSIL_era_periodo      ON FOSIL;
@@ -18,6 +16,7 @@ DROP INDEX IF EXISTS IX_ESTUDIO_FOSIL          ON ESTUDIO_CIENTIFICO;
 DROP INDEX IF EXISTS IX_PERIODO_ERA            ON PERIODO_GEOLOGICO;
 DROP INDEX IF EXISTS IX_LOG_USR                ON LOG_AUDITORIA;
 DROP INDEX IF EXISTS IX_LOG_REG                ON LOG_AUDITORIA;
+DROP INDEX IF EXISTS IX_USUARIO_ROL_usuario    ON USUARIO_ROL;
 GO
 
 CREATE NONCLUSTERED INDEX IX_FOSIL_estado
@@ -50,7 +49,6 @@ CREATE NONCLUSTERED INDEX IX_FOSIL_nombre
     WHERE deleted_at IS NULL;
 GO
 
--- CORRECCION: created_at sin DESC en indice filtrado (SQL Server no admite DESC en filtered index con INCLUDE)
 CREATE NONCLUSTERED INDEX IX_FOSIL_pendientes
     ON FOSIL (estado, created_at) INCLUDE (nombre, explorador_id, canton_id)
     WHERE estado IN ('pendiente','en_revision') AND deleted_at IS NULL;
@@ -93,19 +91,23 @@ CREATE NONCLUSTERED INDEX IX_LOG_REG
     ON LOG_AUDITORIA (tabla_afectada, registro_id, created_at DESC);
 GO
 
+CREATE NONCLUSTERED INDEX IX_USUARIO_ROL_usuario
+    ON USUARIO_ROL (usuario_id, activo) INCLUDE (rol_id);
+GO
+
 CREATE OR ALTER VIEW VW_FOSILES_PUBLICOS AS
 SELECT
     f.id, f.codigo_unico, f.nombre, f.slug, f.descripcion_general,
     f.fecha_hallazgo, f.latitud, f.longitud, f.created_at,
-    cf.nombre           AS categoria_nombre,
-    cf.codigo           AS categoria_codigo,
-    p.nombre            AS pais_nombre,
-    pv.nombre           AS provincia_nombre,
-    c.nombre            AS canton_nombre,
-    eg.nombre           AS era_nombre,
-    pg.nombre           AS periodo_nombre,
-    t.reino             AS taxonomia_reino,
-    t.especie           AS taxonomia_especie,
+    cf.nombre AS categoria_nombre,
+    cf.codigo AS categoria_codigo,
+    p.nombre  AS pais_nombre,
+    pv.nombre AS provincia_nombre,
+    c.nombre  AS canton_nombre,
+    eg.nombre AS era_nombre,
+    pg.nombre AS periodo_nombre,
+    t.reino   AS taxonomia_reino,
+    t.especie AS taxonomia_especie,
     (SELECT TOP 1 url FROM MULTIMEDIA m
      WHERE m.fosil_id = f.id AND m.es_principal = 1 AND m.tipo = 'imagen' AND m.deleted_at IS NULL) AS imagen_principal,
     (SELECT COUNT(*) FROM MULTIMEDIA m
@@ -124,20 +126,20 @@ GO
 CREATE OR ALTER VIEW VW_FOSILES_COMPLETOS AS
 SELECT
     f.*,
-    cf.nombre           AS categoria_nombre,
-    cf.codigo           AS categoria_codigo,
-    p.codigo_iso        AS pais_codigo,
-    p.nombre            AS pais_nombre,
-    pv.codigo           AS provincia_codigo,
-    pv.nombre           AS provincia_nombre,
-    c.codigo            AS canton_codigo,
-    c.nombre            AS canton_nombre,
-    eg.nombre           AS era_nombre,
-    eg.ma_inicio        AS era_ma_inicio,
-    eg.ma_fin           AS era_ma_fin,
-    pg.nombre           AS periodo_nombre,
-    pg.ma_inicio        AS periodo_ma_inicio,
-    pg.ma_fin           AS periodo_ma_fin,
+    cf.nombre  AS categoria_nombre,
+    cf.codigo  AS categoria_codigo,
+    p.codigo_iso AS pais_codigo,
+    p.nombre   AS pais_nombre,
+    pv.codigo  AS provincia_codigo,
+    pv.nombre  AS provincia_nombre,
+    c.codigo   AS canton_codigo,
+    c.nombre   AS canton_nombre,
+    eg.nombre  AS era_nombre,
+    eg.ma_inicio AS era_ma_inicio,
+    eg.ma_fin    AS era_ma_fin,
+    pg.nombre  AS periodo_nombre,
+    pg.ma_inicio AS periodo_ma_inicio,
+    pg.ma_fin    AS periodo_ma_fin,
     t.reino, t.filo, t.clase, t.orden, t.familia, t.genero, t.especie,
     ue.nombre + ' ' + ue.apellido AS explorador_nombre,
     ue.email                       AS explorador_email,
@@ -160,10 +162,11 @@ SELECT
     f.id, f.codigo_unico, f.nombre, f.estado, f.fecha_hallazgo,
     f.created_at AS fecha_registro, f.notas_revision,
     u.nombre + ' ' + u.apellido AS explorador_nombre,
-    u.email AS explorador_email, u.telefono AS explorador_telefono,
-    pv.nombre AS provincia_nombre,
-    c.nombre  AS canton_nombre,
-    cf.nombre AS categoria_nombre,
+    u.email    AS explorador_email,
+    u.telefono AS explorador_telefono,
+    pv.nombre  AS provincia_nombre,
+    c.nombre   AS canton_nombre,
+    cf.nombre  AS categoria_nombre,
     (SELECT COUNT(*) FROM MULTIMEDIA m
      WHERE m.fosil_id = f.id AND m.tipo = 'imagen' AND m.deleted_at IS NULL) AS total_fotos
 FROM FOSIL f
@@ -176,17 +179,60 @@ GO
 
 CREATE OR ALTER VIEW VW_ESTADISTICAS AS
 SELECT
-    (SELECT COUNT(*) FROM FOSIL WHERE deleted_at IS NULL)                                AS total_fosiles,
-    (SELECT COUNT(*) FROM FOSIL WHERE estado='publicado' AND deleted_at IS NULL)         AS publicados,
-    (SELECT COUNT(*) FROM FOSIL WHERE estado='pendiente' AND deleted_at IS NULL)         AS pendientes,
-    (SELECT COUNT(*) FROM FOSIL WHERE estado='rechazado' AND deleted_at IS NULL)         AS rechazados,
-    (SELECT COUNT(*) FROM USUARIO WHERE deleted_at IS NULL AND activo=1)                 AS total_usuarios,
+    (SELECT COUNT(*) FROM FOSIL WHERE deleted_at IS NULL)                              AS total_fosiles,
+    (SELECT COUNT(*) FROM FOSIL WHERE estado='publicado' AND deleted_at IS NULL)       AS publicados,
+    (SELECT COUNT(*) FROM FOSIL WHERE estado='pendiente' AND deleted_at IS NULL)       AS pendientes,
+    (SELECT COUNT(*) FROM FOSIL WHERE estado='rechazado' AND deleted_at IS NULL)       AS rechazados,
+    (SELECT COUNT(*) FROM USUARIO WHERE deleted_at IS NULL AND activo=1)               AS total_usuarios,
     (SELECT COUNT(*) FROM USUARIO u INNER JOIN ROL r ON u.rol_id=r.id
-     WHERE r.nombre='investigador' AND u.deleted_at IS NULL)                             AS investigadores,
+     WHERE r.nombre='investigador' AND u.deleted_at IS NULL)                           AS investigadores,
     (SELECT COUNT(*) FROM USUARIO u INNER JOIN ROL r ON u.rol_id=r.id
-     WHERE r.nombre='explorador' AND u.deleted_at IS NULL)                               AS exploradores,
-    (SELECT COUNT(*) FROM MULTIMEDIA WHERE tipo='imagen' AND deleted_at IS NULL)         AS total_imagenes,
-    (SELECT COUNT(*) FROM ESTUDIO_CIENTIFICO WHERE publicado=1 AND deleted_at IS NULL)   AS estudios_publicados;
+     WHERE r.nombre='explorador' AND u.deleted_at IS NULL)                             AS exploradores,
+    (SELECT COUNT(*) FROM MULTIMEDIA WHERE tipo='imagen' AND deleted_at IS NULL)       AS total_imagenes,
+    (SELECT COUNT(*) FROM ESTUDIO_CIENTIFICO WHERE publicado=1 AND deleted_at IS NULL) AS estudios_publicados;
+GO
+
+CREATE OR ALTER VIEW VW_USUARIOS_CON_ROLES AS
+SELECT
+    u.id,
+    u.nombre,
+    u.apellido,
+    u.email,
+    u.telefono,
+    u.pais,
+    u.profesion,
+    u.centro_trabajo,
+    u.activo,
+    u.created_at,
+    u.updated_at,
+    u.deleted_at,
+    u.rol_id          AS rol_principal_id,
+    rp.nombre         AS rol_principal,
+    (
+        SELECT STRING_AGG(r.nombre, ',')
+        FROM USUARIO_ROL ur
+        INNER JOIN ROL r ON ur.rol_id = r.id
+        WHERE ur.usuario_id = u.id AND ur.activo = 1
+    ) AS todos_los_roles,
+    CASE WHEN EXISTS (
+        SELECT 1 FROM USUARIO_ROL ur INNER JOIN ROL r ON ur.rol_id = r.id
+        WHERE ur.usuario_id = u.id AND r.nombre = 'administrador' AND ur.activo = 1
+    ) THEN 1 ELSE 0 END AS es_administrador,
+    CASE WHEN EXISTS (
+        SELECT 1 FROM USUARIO_ROL ur INNER JOIN ROL r ON ur.rol_id = r.id
+        WHERE ur.usuario_id = u.id AND r.nombre = 'investigador' AND ur.activo = 1
+    ) THEN 1 ELSE 0 END AS es_investigador,
+    CASE WHEN EXISTS (
+        SELECT 1 FROM USUARIO_ROL ur INNER JOIN ROL r ON ur.rol_id = r.id
+        WHERE ur.usuario_id = u.id AND r.nombre = 'explorador' AND ur.activo = 1
+    ) THEN 1 ELSE 0 END AS es_explorador,
+    CASE WHEN EXISTS (
+        SELECT 1 FROM USUARIO_ROL ur INNER JOIN ROL r ON ur.rol_id = r.id
+        WHERE ur.usuario_id = u.id AND r.nombre = 'publico' AND ur.activo = 1
+    ) THEN 1 ELSE 0 END AS es_publico
+FROM USUARIO u
+INNER JOIN ROL rp ON u.rol_id = rp.id
+WHERE u.deleted_at IS NULL;
 GO
 
 CREATE OR ALTER PROCEDURE sp_generar_codigo_fosil
@@ -324,15 +370,13 @@ BEGIN
             IF @estado IS NOT NULL
             BEGIN
                 IF NOT EXISTS (
-                    SELECT 1 FROM USUARIO u
-                    INNER JOIN ROL r ON u.rol_id = r.id
+                    SELECT 1 FROM USUARIO u INNER JOIN ROL r ON u.rol_id = r.id
                     WHERE u.id = @usuario_id AND r.nombre = 'administrador' AND u.deleted_at IS NULL
                 )
                     THROW 50021, 'Solo administrador puede cambiar el estado.', 1;
             END
             ELSE IF NOT EXISTS (
-                SELECT 1 FROM USUARIO u
-                INNER JOIN ROL r ON u.rol_id = r.id
+                SELECT 1 FROM USUARIO u INNER JOIN ROL r ON u.rol_id = r.id
                 WHERE u.id = @usuario_id AND u.deleted_at IS NULL
                   AND (
                       r.nombre = 'administrador'
@@ -356,26 +400,23 @@ BEGIN
         EXEC sys.sp_set_session_context @key = N'audit_user_id', @value = @audit_ctx;
 
         UPDATE FOSIL SET
-            nombre = ISNULL(@nombre, nombre),
-            descripcion_general = ISNULL(@descripcion_general, descripcion_general),
+            nombre                = ISNULL(@nombre, nombre),
+            descripcion_general   = ISNULL(@descripcion_general, descripcion_general),
             descripcion_detallada = CASE WHEN @aplicar_descripcion_detallada = 1
                 THEN @descripcion_detallada ELSE descripcion_detallada END,
-            categoria_id = ISNULL(@categoria_id, categoria_id),
-            era_id = ISNULL(@era_id, era_id),
-            periodo_id = ISNULL(@periodo_id, periodo_id),
-            taxonomia_id = CASE WHEN @aplicar_taxonomia = 1
+            categoria_id          = ISNULL(@categoria_id, categoria_id),
+            era_id                = ISNULL(@era_id, era_id),
+            periodo_id            = ISNULL(@periodo_id, periodo_id),
+            taxonomia_id          = CASE WHEN @aplicar_taxonomia = 1
                 THEN @taxonomia_id ELSE taxonomia_id END,
-            canton_id = ISNULL(@canton_id, canton_id),
-            latitud = CASE WHEN @actualizar_coordenadas = 1
-                THEN @latitud ELSE latitud END,
-            longitud = CASE WHEN @actualizar_coordenadas = 1
-                THEN @longitud ELSE longitud END,
-            altitud_msnm = CASE WHEN @actualizar_coordenadas = 1
-                THEN @altitud_msnm ELSE altitud_msnm END,
+            canton_id             = ISNULL(@canton_id, canton_id),
+            latitud               = CASE WHEN @actualizar_coordenadas = 1 THEN @latitud       ELSE latitud      END,
+            longitud              = CASE WHEN @actualizar_coordenadas = 1 THEN @longitud      ELSE longitud     END,
+            altitud_msnm          = CASE WHEN @actualizar_coordenadas = 1 THEN @altitud_msnm  ELSE altitud_msnm END,
             descripcion_ubicacion = ISNULL(@descripcion_ubicacion, descripcion_ubicacion),
-            estado = ISNULL(@estado, estado),
-            slug = ISNULL(@slug, slug),
-            updated_at = GETDATE()
+            estado                = ISNULL(@estado, estado),
+            slug                  = ISNULL(@slug, slug),
+            updated_at            = GETDATE()
         WHERE id = @fosil_id AND deleted_at IS NULL;
 
         EXEC sys.sp_set_session_context @key = N'audit_user_id', @value = NULL;
@@ -431,7 +472,7 @@ BEGIN
         INSERT INTO LOG_AUDITORIA (usuario_id, tabla_afectada, registro_id, accion, datos_anteriores, datos_nuevos)
         VALUES (@admin_id, 'FOSIL', @fosil_id, 'UPDATE',
             (SELECT @estado_anterior AS estado FOR JSON PATH, WITHOUT_ARRAY_WRAPPER),
-            (SELECT @nuevo_estado AS estado FOR JSON PATH, WITHOUT_ARRAY_WRAPPER));
+            (SELECT @nuevo_estado    AS estado FOR JSON PATH, WITHOUT_ARRAY_WRAPPER));
 
         COMMIT TRANSACTION;
     END TRY
@@ -492,16 +533,10 @@ CREATE OR ALTER PROCEDURE sp_obtener_fosil_por_id
 AS
 BEGIN
     SET NOCOUNT ON;
-    SELECT *
-    FROM VW_FOSILES_COMPLETOS
-    WHERE id = @fosil_id;
+    SELECT * FROM VW_FOSILES_COMPLETOS WHERE id = @fosil_id;
 END
 GO
 
--- Busqueda: columnas alineadas con el indice Full-Text en FOSIL y TAXONOMIA (00_fulltext_setup.sql).
--- @modo_busqueda: 0 = CONTAINS (palabras/frase, caracteres conflictivos atenuados),
---                 1 = FREETEXT (lenguaje natural),
---                 2 = subcadena (CHARINDEX, sin depender del catalogo FT).
 CREATE OR ALTER PROCEDURE sp_buscar_fosiles
     @nombre        VARCHAR(255) = NULL,
     @categoria_id  INT          = NULL,
@@ -519,9 +554,9 @@ BEGIN
     IF @modo_busqueda NOT IN (0, 1, 2)
         SET @modo_busqueda = 1;
 
-    DECLARE @offset INT = (@pagina - 1) * @por_pagina;
+    DECLARE @offset    INT          = (@pagina - 1) * @por_pagina;
     DECLARE @search_ft NVARCHAR(4000) = NULL;
-    DECLARE @busqueda_vacia BIT = 0;
+    DECLARE @busqueda_vacia BIT    = 0;
 
     IF @nombre IS NOT NULL
     BEGIN
@@ -534,27 +569,16 @@ BEGIN
     END;
 
     SELECT
-        f.id,
-        f.codigo_unico,
-        f.nombre,
-        f.slug,
-        f.descripcion_general,
-        f.estado,
-        f.fecha_hallazgo,
-        f.latitud,
-        f.longitud,
-        cf.nombre  AS categoria_nombre,
-        eg.nombre  AS era_nombre,
-        pg.nombre  AS periodo_nombre,
-        pv.nombre  AS provincia_nombre,
-        c.nombre   AS canton_nombre,
+        f.id, f.codigo_unico, f.nombre, f.slug, f.descripcion_general,
+        f.estado, f.fecha_hallazgo, f.latitud, f.longitud,
+        cf.nombre AS categoria_nombre,
+        eg.nombre AS era_nombre,
+        pg.nombre AS periodo_nombre,
+        pv.nombre AS provincia_nombre,
+        c.nombre  AS canton_nombre,
         (
-            SELECT TOP 1 url
-            FROM MULTIMEDIA m
-            WHERE m.fosil_id    = f.id
-              AND m.es_principal = 1
-              AND m.tipo         = 'imagen'
-              AND m.deleted_at   IS NULL
+            SELECT TOP 1 url FROM MULTIMEDIA m
+            WHERE m.fosil_id = f.id AND m.es_principal = 1 AND m.tipo = 'imagen' AND m.deleted_at IS NULL
         ) AS imagen_principal,
         COUNT(*) OVER() AS total_resultados
     FROM FOSIL f
@@ -573,41 +597,23 @@ BEGIN
             OR (
                 @modo_busqueda = 0
                 AND (
-                    CONTAINS((
-                        f.nombre,
-                        f.descripcion_general,
-                        f.descripcion_detallada,
-                        f.descripcion_estado_orig,
-                        f.contexto_geologico,
-                        f.descripcion_ubicacion,
-                        f.notas_revision
-                    ), @search_ft)
-                    OR (
-                        t.id IS NOT NULL
-                        AND CONTAINS((
+                    CONTAINS((f.nombre, f.descripcion_general, f.descripcion_detallada,
+                               f.descripcion_estado_orig, f.contexto_geologico,
+                               f.descripcion_ubicacion, f.notas_revision), @search_ft)
+                    OR (t.id IS NOT NULL AND CONTAINS((
                             t.reino, t.filo, t.clase, t.orden, t.familia, t.genero, t.especie
-                        ), @search_ft)
-                    )
+                        ), @search_ft))
                 )
             )
             OR (
                 @modo_busqueda = 1
                 AND (
-                    FREETEXT((
-                        f.nombre,
-                        f.descripcion_general,
-                        f.descripcion_detallada,
-                        f.descripcion_estado_orig,
-                        f.contexto_geologico,
-                        f.descripcion_ubicacion,
-                        f.notas_revision
-                    ), @search_ft)
-                    OR (
-                        t.id IS NOT NULL
-                        AND FREETEXT((
+                    FREETEXT((f.nombre, f.descripcion_general, f.descripcion_detallada,
+                               f.descripcion_estado_orig, f.contexto_geologico,
+                               f.descripcion_ubicacion, f.notas_revision), @search_ft)
+                    OR (t.id IS NOT NULL AND FREETEXT((
                             t.reino, t.filo, t.clase, t.orden, t.familia, t.genero, t.especie
-                        ), @search_ft)
-                    )
+                        ), @search_ft))
                 )
             )
             OR (
@@ -615,23 +621,17 @@ BEGIN
                 AND (
                     CHARINDEX(@nombre, f.nombre) > 0
                     OR CHARINDEX(@nombre, f.descripcion_general) > 0
-                    OR (f.descripcion_detallada IS NOT NULL AND CHARINDEX(@nombre, f.descripcion_detallada) > 0)
+                    OR (f.descripcion_detallada  IS NOT NULL AND CHARINDEX(@nombre, f.descripcion_detallada)  > 0)
                     OR (f.descripcion_estado_orig IS NOT NULL AND CHARINDEX(@nombre, f.descripcion_estado_orig) > 0)
-                    OR (f.contexto_geologico IS NOT NULL AND CHARINDEX(@nombre, f.contexto_geologico) > 0)
-                    OR (f.descripcion_ubicacion IS NOT NULL AND CHARINDEX(@nombre, f.descripcion_ubicacion) > 0)
-                    OR (f.notas_revision IS NOT NULL AND CHARINDEX(@nombre, f.notas_revision) > 0)
-                    OR (
-                        t.id IS NOT NULL
-                        AND (
-                            CHARINDEX(@nombre, t.reino) > 0
-                            OR CHARINDEX(@nombre, t.filo) > 0
-                            OR CHARINDEX(@nombre, t.clase) > 0
-                            OR CHARINDEX(@nombre, t.orden) > 0
-                            OR CHARINDEX(@nombre, t.familia) > 0
-                            OR CHARINDEX(@nombre, t.genero) > 0
-                            OR CHARINDEX(@nombre, t.especie) > 0
-                        )
-                    )
+                    OR (f.contexto_geologico      IS NOT NULL AND CHARINDEX(@nombre, f.contexto_geologico)      > 0)
+                    OR (f.descripcion_ubicacion   IS NOT NULL AND CHARINDEX(@nombre, f.descripcion_ubicacion)   > 0)
+                    OR (f.notas_revision          IS NOT NULL AND CHARINDEX(@nombre, f.notas_revision)          > 0)
+                    OR (t.id IS NOT NULL AND (
+                        CHARINDEX(@nombre, t.reino)   > 0 OR CHARINDEX(@nombre, t.filo)    > 0 OR
+                        CHARINDEX(@nombre, t.clase)   > 0 OR CHARINDEX(@nombre, t.orden)   > 0 OR
+                        CHARINDEX(@nombre, t.familia) > 0 OR CHARINDEX(@nombre, t.genero)  > 0 OR
+                        CHARINDEX(@nombre, t.especie) > 0
+                    ))
                 )
             )
         )
@@ -646,36 +646,32 @@ END
 GO
 
 CREATE OR ALTER PROCEDURE sp_agregar_multimedia
-    @usuario_id       INT,
-    @fosil_id         INT,
-    @tipo             VARCHAR(10),
-    @subtipo          VARCHAR(20),
-    @url              VARCHAR(500),
-    @nombre_archivo   VARCHAR(255) = NULL,
-    @es_principal     BIT          = 0,
-    @orden            INT          = 0,
-    @descripcion      VARCHAR(500) = NULL,
-    @nuevo_id         INT          OUTPUT
+    @usuario_id     INT,
+    @fosil_id       INT,
+    @tipo           VARCHAR(10),
+    @subtipo        VARCHAR(20),
+    @url            VARCHAR(500),
+    @nombre_archivo VARCHAR(255) = NULL,
+    @es_principal   BIT          = 0,
+    @orden          INT          = 0,
+    @descripcion    VARCHAR(500) = NULL,
+    @nuevo_id       INT          OUTPUT
 AS
 BEGIN
     SET NOCOUNT ON;
     IF NOT EXISTS (SELECT 1 FROM FOSIL WHERE id = @fosil_id AND deleted_at IS NULL)
         THROW 50030, 'Fosil no encontrado o eliminado.', 1;
 
-    INSERT INTO MULTIMEDIA (
-        fosil_id, tipo, subtipo, url, nombre_archivo, es_principal, orden, descripcion
-    ) VALUES (
-        @fosil_id, @tipo, @subtipo, @url,
-        COALESCE(@nombre_archivo, N'archivo'),
-        @es_principal, @orden, @descripcion
-    );
+    INSERT INTO MULTIMEDIA (fosil_id, tipo, subtipo, url, nombre_archivo, es_principal, orden, descripcion)
+    VALUES (@fosil_id, @tipo, @subtipo, @url, COALESCE(@nombre_archivo, N'archivo'), @es_principal, @orden, @descripcion);
 
     SET @nuevo_id = SCOPE_IDENTITY();
 
     INSERT INTO LOG_AUDITORIA (usuario_id, tabla_afectada, registro_id, accion, datos_nuevos)
     VALUES (
         @usuario_id, 'MULTIMEDIA', @nuevo_id, 'INSERT',
-        (SELECT @fosil_id AS fosil_id, @tipo AS tipo, @subtipo AS subtipo, @url AS url FOR JSON PATH, WITHOUT_ARRAY_WRAPPER)
+        (SELECT @fosil_id AS fosil_id, @tipo AS tipo, @subtipo AS subtipo, @url AS url
+         FOR JSON PATH, WITHOUT_ARRAY_WRAPPER)
     );
 END
 GO
@@ -706,25 +702,21 @@ BEGIN
         THROW 50031, 'Multimedia no encontrada o eliminada.', 1;
 
     UPDATE MULTIMEDIA SET
-        tipo           = ISNULL(@tipo, tipo),
-        subtipo        = ISNULL(@subtipo, subtipo),
-        url            = ISNULL(@url, url),
+        tipo           = ISNULL(@tipo,           tipo),
+        subtipo        = ISNULL(@subtipo,        subtipo),
+        url            = ISNULL(@url,            url),
         nombre_archivo = ISNULL(@nombre_archivo, nombre_archivo),
-        es_principal   = ISNULL(@es_principal, es_principal),
-        orden          = ISNULL(@orden, orden),
-        descripcion    = ISNULL(@descripcion, descripcion)
+        es_principal   = ISNULL(@es_principal,   es_principal),
+        orden          = ISNULL(@orden,          orden),
+        descripcion    = ISNULL(@descripcion,    descripcion)
     WHERE id = @multimedia_id AND deleted_at IS NULL;
 
     INSERT INTO LOG_AUDITORIA (usuario_id, tabla_afectada, registro_id, accion, datos_anteriores, datos_nuevos)
     VALUES (
         @usuario_id, 'MULTIMEDIA', @multimedia_id, 'UPDATE',
         @ant,
-        (
-            SELECT id, fosil_id, tipo, subtipo, url, nombre_archivo, es_principal, orden
-            FROM MULTIMEDIA
-            WHERE id = @multimedia_id
-            FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
-        )
+        (SELECT id, fosil_id, tipo, subtipo, url, nombre_archivo, es_principal, orden
+         FROM MULTIMEDIA WHERE id = @multimedia_id FOR JSON PATH, WITHOUT_ARRAY_WRAPPER)
     );
 END
 GO
@@ -750,23 +742,23 @@ END
 GO
 
 CREATE OR ALTER PROCEDURE sp_registrar_estudio
-    @usuario_id               INT,
-    @fosil_id                 INT,
-    @investigador_id          INT,
-    @titulo                   VARCHAR(300),
-    @contexto_objetivo        VARCHAR(MAX),
-    @tipo_analisis            VARCHAR(200),
-    @resultados               VARCHAR(MAX),
-    @composicion              VARCHAR(MAX) = NULL,
-    @condiciones_hallazgo     VARCHAR(MAX) = NULL,
-    @informacion_adicional    VARCHAR(MAX) = NULL,
-    @documentacion_contacto   VARCHAR(500) = NULL,
-    @publicado                BIT = 0,
-    @nuevo_id                 INT OUTPUT
+    @usuario_id             INT,
+    @fosil_id               INT,
+    @investigador_id        INT,
+    @titulo                 VARCHAR(300),
+    @contexto_objetivo      VARCHAR(MAX),
+    @tipo_analisis          VARCHAR(200),
+    @resultados             VARCHAR(MAX),
+    @composicion            VARCHAR(MAX) = NULL,
+    @condiciones_hallazgo   VARCHAR(MAX) = NULL,
+    @informacion_adicional  VARCHAR(MAX) = NULL,
+    @documentacion_contacto VARCHAR(500) = NULL,
+    @publicado              BIT          = 0,
+    @nuevo_id               INT          OUTPUT
 AS
 BEGIN
     SET NOCOUNT ON;
-    IF NOT EXISTS (SELECT 1 FROM FOSIL WHERE id = @fosil_id AND deleted_at IS NULL)
+    IF NOT EXISTS (SELECT 1 FROM FOSIL   WHERE id = @fosil_id        AND deleted_at IS NULL)
         THROW 50040, 'Fosil no encontrado o eliminado.', 1;
     IF NOT EXISTS (SELECT 1 FROM USUARIO WHERE id = @investigador_id AND deleted_at IS NULL)
         THROW 50041, 'Investigador no valido.', 1;
@@ -790,18 +782,18 @@ END
 GO
 
 CREATE OR ALTER PROCEDURE sp_actualizar_estudio
-    @estudio_id              INT,
-    @usuario_id              INT,
-    @titulo                  VARCHAR(300)   = NULL,
-    @contexto_objetivo       VARCHAR(MAX)   = NULL,
-    @tipo_analisis           VARCHAR(200)   = NULL,
-    @resultados              VARCHAR(MAX)   = NULL,
-    @composicion             VARCHAR(MAX)   = NULL,
-    @condiciones_hallazgo    VARCHAR(MAX)   = NULL,
-    @informacion_adicional   VARCHAR(MAX)   = NULL,
-    @documentacion_contacto  VARCHAR(500)   = NULL,
-    @publicado               BIT            = NULL,
-    @investigador_id         INT            = NULL
+    @estudio_id             INT,
+    @usuario_id             INT,
+    @titulo                 VARCHAR(300) = NULL,
+    @contexto_objetivo      VARCHAR(MAX) = NULL,
+    @tipo_analisis          VARCHAR(200) = NULL,
+    @resultados             VARCHAR(MAX) = NULL,
+    @composicion            VARCHAR(MAX) = NULL,
+    @condiciones_hallazgo   VARCHAR(MAX) = NULL,
+    @informacion_adicional  VARCHAR(MAX) = NULL,
+    @documentacion_contacto VARCHAR(500) = NULL,
+    @publicado              BIT          = NULL,
+    @investigador_id        INT          = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -822,16 +814,16 @@ BEGIN
         THROW 50043, 'Investigador no valido.', 1;
 
     UPDATE ESTUDIO_CIENTIFICO SET
-        titulo                  = ISNULL(@titulo, titulo),
-        contexto_objetivo       = ISNULL(@contexto_objetivo, contexto_objetivo),
-        tipo_analisis           = ISNULL(@tipo_analisis, tipo_analisis),
-        resultados              = ISNULL(@resultados, resultados),
-        composicion             = ISNULL(@composicion, composicion),
-        condiciones_hallazgo    = ISNULL(@condiciones_hallazgo, condiciones_hallazgo),
-        informacion_adicional   = ISNULL(@informacion_adicional, informacion_adicional),
+        titulo                  = ISNULL(@titulo,                 titulo),
+        contexto_objetivo       = ISNULL(@contexto_objetivo,      contexto_objetivo),
+        tipo_analisis           = ISNULL(@tipo_analisis,          tipo_analisis),
+        resultados              = ISNULL(@resultados,             resultados),
+        composicion             = ISNULL(@composicion,            composicion),
+        condiciones_hallazgo    = ISNULL(@condiciones_hallazgo,   condiciones_hallazgo),
+        informacion_adicional   = ISNULL(@informacion_adicional,  informacion_adicional),
         documentacion_contacto  = ISNULL(@documentacion_contacto, documentacion_contacto),
-        publicado               = ISNULL(@publicado, publicado),
-        investigador_id         = ISNULL(@investigador_id, investigador_id),
+        publicado               = ISNULL(@publicado,              publicado),
+        investigador_id         = ISNULL(@investigador_id,        investigador_id),
         updated_at              = GETDATE()
     WHERE id = @estudio_id AND deleted_at IS NULL;
 
@@ -839,20 +831,16 @@ BEGIN
     VALUES (
         @usuario_id, 'ESTUDIO_CIENTIFICO', @estudio_id, 'UPDATE',
         @ant,
-        (
-            SELECT id, fosil_id, investigador_id, titulo, publicado
-            FROM ESTUDIO_CIENTIFICO
-            WHERE id = @estudio_id
-            FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
-        )
+        (SELECT id, fosil_id, investigador_id, titulo, publicado
+         FROM ESTUDIO_CIENTIFICO WHERE id = @estudio_id FOR JSON PATH, WITHOUT_ARRAY_WRAPPER)
     );
 END
 GO
 
 CREATE OR ALTER PROCEDURE sp_eliminar_estudio
-    @estudio_id  INT,
-    @usuario_id  INT,
-    @motivo      VARCHAR(500) = NULL
+    @estudio_id INT,
+    @usuario_id INT,
+    @motivo     VARCHAR(500) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -916,6 +904,137 @@ BEGIN
         @usuario_id, 'REFERENCIA_ESTUDIO', @referencia_id, 'DELETE',
         (SELECT @estudio_id AS estudio_id FOR JSON PATH, WITHOUT_ARRAY_WRAPPER)
     );
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_asignar_rol
+    @usuario_id INT,
+    @rol_nombre VARCHAR(50),
+    @admin_id   INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    BEGIN TRANSACTION;
+    BEGIN TRY
+        IF NOT EXISTS (SELECT 1 FROM USUARIO WHERE id = @usuario_id AND deleted_at IS NULL)
+            THROW 50060, 'Usuario no encontrado o eliminado.', 1;
+
+        IF NOT EXISTS (SELECT 1 FROM ROL WHERE nombre = @rol_nombre)
+            THROW 50061, 'Rol no valido.', 1;
+
+        IF NOT EXISTS (
+            SELECT 1 FROM USUARIO u INNER JOIN ROL r ON u.rol_id = r.id
+            WHERE u.id = @admin_id AND r.nombre = 'administrador' AND u.deleted_at IS NULL
+        )
+            THROW 50062, 'Solo administradores pueden asignar roles.', 1;
+
+        DECLARE @rol_id INT;
+        SELECT @rol_id = id FROM ROL WHERE nombre = @rol_nombre;
+
+        IF EXISTS (SELECT 1 FROM USUARIO_ROL WHERE usuario_id = @usuario_id AND rol_id = @rol_id)
+            UPDATE USUARIO_ROL SET activo = 1
+            WHERE usuario_id = @usuario_id AND rol_id = @rol_id;
+        ELSE
+            INSERT INTO USUARIO_ROL (usuario_id, rol_id) VALUES (@usuario_id, @rol_id);
+
+        INSERT INTO LOG_AUDITORIA (usuario_id, tabla_afectada, registro_id, accion, datos_nuevos)
+        VALUES (
+            @admin_id, 'USUARIO_ROL', @usuario_id, 'INSERT',
+            (SELECT @rol_nombre AS rol_asignado, @usuario_id AS usuario_id
+             FOR JSON PATH, WITHOUT_ARRAY_WRAPPER)
+        );
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_quitar_rol
+    @usuario_id INT,
+    @rol_nombre VARCHAR(50),
+    @admin_id   INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    BEGIN TRANSACTION;
+    BEGIN TRY
+        IF NOT EXISTS (SELECT 1 FROM USUARIO WHERE id = @usuario_id AND deleted_at IS NULL)
+            THROW 50063, 'Usuario no encontrado o eliminado.', 1;
+
+        IF NOT EXISTS (
+            SELECT 1 FROM USUARIO u INNER JOIN ROL r ON u.rol_id = r.id
+            WHERE u.id = @admin_id AND r.nombre = 'administrador' AND u.deleted_at IS NULL
+        )
+            THROW 50064, 'Solo administradores pueden quitar roles.', 1;
+
+        DECLARE @rol_id INT;
+        SELECT @rol_id = id FROM ROL WHERE nombre = @rol_nombre;
+
+        IF @rol_id IS NULL
+            THROW 50065, 'Rol no valido.', 1;
+
+        IF (SELECT COUNT(*) FROM USUARIO_ROL WHERE usuario_id = @usuario_id AND activo = 1) <= 1
+            THROW 50066, 'El usuario debe tener al menos un rol activo.', 1;
+
+        UPDATE USUARIO_ROL SET activo = 0
+        WHERE usuario_id = @usuario_id AND rol_id = @rol_id;
+
+        INSERT INTO LOG_AUDITORIA (usuario_id, tabla_afectada, registro_id, accion, datos_nuevos)
+        VALUES (
+            @admin_id, 'USUARIO_ROL', @usuario_id, 'UPDATE',
+            (SELECT @rol_nombre AS rol_removido, @usuario_id AS usuario_id
+             FOR JSON PATH, WITHOUT_ARRAY_WRAPPER)
+        );
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_obtener_roles_usuario
+    @usuario_id INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT
+        r.id,
+        r.nombre,
+        r.descripcion,
+        ur.activo,
+        ur.created_at AS asignado_en
+    FROM USUARIO_ROL ur
+    INNER JOIN ROL r ON ur.rol_id = r.id
+    WHERE ur.usuario_id = @usuario_id
+    ORDER BY r.nombre;
+END
+GO
+
+CREATE OR ALTER FUNCTION fn_usuario_tiene_rol (
+    @usuario_id INT,
+    @rol_nombre VARCHAR(50)
+)
+RETURNS BIT
+AS
+BEGIN
+    DECLARE @resultado BIT = 0;
+    IF EXISTS (
+        SELECT 1
+        FROM USUARIO_ROL ur
+        INNER JOIN ROL r ON ur.rol_id = r.id
+        WHERE ur.usuario_id = @usuario_id
+          AND r.nombre      = @rol_nombre
+          AND ur.activo     = 1
+    )
+        SET @resultado = 1;
+    RETURN @resultado;
 END
 GO
 
