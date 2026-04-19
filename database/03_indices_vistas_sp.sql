@@ -648,10 +648,11 @@ GO
 CREATE OR ALTER PROCEDURE sp_agregar_multimedia
     @usuario_id     INT,
     @fosil_id       INT,
-    @tipo           VARCHAR(10),
+    @tipo           VARCHAR(20),
     @subtipo        VARCHAR(20),
     @url            VARCHAR(500),
     @nombre_archivo VARCHAR(255) = NULL,
+    @formato        VARCHAR(10)  = NULL,
     @es_principal   BIT          = 0,
     @orden          INT          = 0,
     @descripcion    VARCHAR(500) = NULL,
@@ -662,15 +663,23 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM FOSIL WHERE id = @fosil_id AND deleted_at IS NULL)
         THROW 50030, 'Fosil no encontrado o eliminado.', 1;
 
-    INSERT INTO MULTIMEDIA (fosil_id, tipo, subtipo, url, nombre_archivo, es_principal, orden, descripcion)
-    VALUES (@fosil_id, @tipo, @subtipo, @url, COALESCE(@nombre_archivo, N'archivo'), @es_principal, @orden, @descripcion);
+    INSERT INTO MULTIMEDIA (
+        fosil_id, tipo, subtipo, url, nombre_archivo,
+        formato, es_principal, orden, descripcion
+    ) VALUES (
+        @fosil_id, @tipo, @subtipo, @url,
+        COALESCE(@nombre_archivo, N'archivo'),
+        @formato, @es_principal, @orden, @descripcion
+    );
 
     SET @nuevo_id = SCOPE_IDENTITY();
 
     INSERT INTO LOG_AUDITORIA (usuario_id, tabla_afectada, registro_id, accion, datos_nuevos)
     VALUES (
         @usuario_id, 'MULTIMEDIA', @nuevo_id, 'INSERT',
-        (SELECT @fosil_id AS fosil_id, @tipo AS tipo, @subtipo AS subtipo, @url AS url
+        (SELECT @fosil_id AS fosil_id, @tipo AS tipo,
+                @subtipo  AS subtipo,  @url  AS url,
+                @formato  AS formato
          FOR JSON PATH, WITHOUT_ARRAY_WRAPPER)
     );
 END
@@ -679,10 +688,11 @@ GO
 CREATE OR ALTER PROCEDURE sp_actualizar_multimedia
     @multimedia_id  INT,
     @usuario_id     INT,
-    @tipo           VARCHAR(10)  = NULL,
+    @tipo           VARCHAR(20)  = NULL,
     @subtipo        VARCHAR(20)  = NULL,
     @url            VARCHAR(500) = NULL,
     @nombre_archivo VARCHAR(255) = NULL,
+    @formato        VARCHAR(10)  = NULL,
     @es_principal   BIT          = NULL,
     @orden          INT          = NULL,
     @descripcion    VARCHAR(500) = NULL
@@ -692,7 +702,7 @@ BEGIN
     DECLARE @ant NVARCHAR(MAX);
 
     SELECT @ant = (
-        SELECT id, fosil_id, tipo, subtipo, url, nombre_archivo, es_principal, orden
+        SELECT id, fosil_id, tipo, subtipo, url, nombre_archivo, formato, es_principal, orden
         FROM MULTIMEDIA
         WHERE id = @multimedia_id AND deleted_at IS NULL
         FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
@@ -706,6 +716,7 @@ BEGIN
         subtipo        = ISNULL(@subtipo,        subtipo),
         url            = ISNULL(@url,            url),
         nombre_archivo = ISNULL(@nombre_archivo, nombre_archivo),
+        formato        = ISNULL(@formato,        formato),
         es_principal   = ISNULL(@es_principal,   es_principal),
         orden          = ISNULL(@orden,          orden),
         descripcion    = ISNULL(@descripcion,    descripcion)
@@ -715,7 +726,7 @@ BEGIN
     VALUES (
         @usuario_id, 'MULTIMEDIA', @multimedia_id, 'UPDATE',
         @ant,
-        (SELECT id, fosil_id, tipo, subtipo, url, nombre_archivo, es_principal, orden
+        (SELECT id, fosil_id, tipo, subtipo, url, nombre_archivo, formato, es_principal, orden
          FROM MULTIMEDIA WHERE id = @multimedia_id FOR JSON PATH, WITHOUT_ARRAY_WRAPPER)
     );
 END
