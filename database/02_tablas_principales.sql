@@ -89,10 +89,11 @@ GO
 CREATE TABLE MULTIMEDIA (
     id             INT          NOT NULL IDENTITY(1,1),
     fosil_id       INT          NOT NULL,
-    tipo           VARCHAR(10)  NOT NULL,
+    tipo           VARCHAR(20)  NOT NULL,
     subtipo        VARCHAR(20)  NOT NULL,
     url            VARCHAR(500) NOT NULL,
     nombre_archivo VARCHAR(255) NOT NULL,
+    formato        VARCHAR(10)  NULL,
     angulo         VARCHAR(100) NULL,
     descripcion    VARCHAR(500) NULL,
     tamano_bytes   BIGINT       NULL,
@@ -104,8 +105,8 @@ CREATE TABLE MULTIMEDIA (
     deleted_at     DATETIME2    NULL,
     CONSTRAINT PK_MULTIMEDIA    PRIMARY KEY (id),
     CONSTRAINT FK_MULTI_FOSIL   FOREIGN KEY (fosil_id) REFERENCES FOSIL(id),
-    CONSTRAINT CK_MULTI_tipo    CHECK (tipo    IN ('imagen','video')),
-    CONSTRAINT CK_MULTI_subtipo CHECK (subtipo IN ('antes','despues','analisis','general','portada'))
+    CONSTRAINT CK_MULTI_tipo    CHECK (tipo    IN ('imagen','video','modelo3d','audio','documento')),
+    CONSTRAINT CK_MULTI_subtipo CHECK (subtipo IN ('antes','despues','analisis','general','portada','reconstruccion','escaneo'))
 );
 GO
 
