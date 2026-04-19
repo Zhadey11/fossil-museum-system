@@ -537,6 +537,9 @@ BEGIN
 END
 GO
 
+-- @modo_busqueda: 0=CONTAINS (Full-Text exacto), 1=FREETEXT (Full-Text lenguaje natural), 2=CHARINDEX (sin Full-Text)
+-- IMPORTANTE: modos 0 y 1 requieren Full-Text instalado (00_fulltext_setup.sql ejecutado).
+-- Si Full-Text no esta instalado, usar siempre @modo_busqueda = 2.
 CREATE OR ALTER PROCEDURE sp_buscar_fosiles
     @nombre        VARCHAR(255) = NULL,
     @categoria_id  INT          = NULL,
@@ -546,26 +549,29 @@ CREATE OR ALTER PROCEDURE sp_buscar_fosiles
     @solo_publico  BIT          = 1,
     @pagina        INT          = 1,
     @por_pagina    INT          = 12,
-    @modo_busqueda TINYINT      = 1
+    @modo_busqueda TINYINT      = 2
 AS
 BEGIN
     SET NOCOUNT ON;
 
     IF @modo_busqueda NOT IN (0, 1, 2)
-        SET @modo_busqueda = 1;
+        SET @modo_busqueda = 2;
 
-    DECLARE @offset    INT          = (@pagina - 1) * @por_pagina;
-    DECLARE @search_ft NVARCHAR(4000) = NULL;
-    DECLARE @busqueda_vacia BIT    = 0;
+    DECLARE @offset         INT           = (@pagina - 1) * @por_pagina;
+    DECLARE @search_ft      NVARCHAR(4000) = NULL;
+    DECLARE @buscar_nombre  BIT           = 0;
 
-    IF @nombre IS NOT NULL
+    -- Solo procesar termino de busqueda si se proporciono un nombre
+    IF @nombre IS NOT NULL AND LEN(LTRIM(RTRIM(@nombre))) > 0
     BEGIN
+        SET @buscar_nombre = 1;
+        -- Limpiar caracteres especiales para Full-Text (modos 0 y 1)
         SET @search_ft = LTRIM(RTRIM(
-            REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(ISNULL(@nombre, N''),
+            REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(@nombre,
                 N'"', N' '), N'&', N' '), N'|', N' '), N'(', N' '), N')', N' ')
         ));
         IF LEN(@search_ft) = 0
-            SET @busqueda_vacia = 1;
+            SET @buscar_nombre = 0;
     END;
 
     SELECT
@@ -578,7 +584,8 @@ BEGIN
         c.nombre  AS canton_nombre,
         (
             SELECT TOP 1 url FROM MULTIMEDIA m
-            WHERE m.fosil_id = f.id AND m.es_principal = 1 AND m.tipo = 'imagen' AND m.deleted_at IS NULL
+            WHERE m.fosil_id = f.id AND m.es_principal = 1
+              AND m.tipo = 'imagen' AND m.deleted_at IS NULL
         ) AS imagen_principal,
         COUNT(*) OVER() AS total_resultados
     FROM FOSIL f
@@ -591,11 +598,12 @@ BEGIN
     WHERE
         f.deleted_at IS NULL
         AND (@solo_publico = 0 OR f.estado = 'publicado')
-        AND (@nombre IS NULL OR @busqueda_vacia = 0)
         AND (
-            @nombre IS NULL
+            -- Sin nombre: mostrar todos (filtros opcionales aplican abajo)
+            @buscar_nombre = 0
+            -- Modo 0: Full-Text CONTAINS (busqueda exacta de palabras)
             OR (
-                @modo_busqueda = 0
+                @modo_busqueda = 0 AND @buscar_nombre = 1
                 AND (
                     CONTAINS((f.nombre, f.descripcion_general, f.descripcion_detallada,
                                f.descripcion_estado_orig, f.contexto_geologico,
@@ -605,8 +613,9 @@ BEGIN
                         ), @search_ft))
                 )
             )
+            -- Modo 1: Full-Text FREETEXT (lenguaje natural, mas flexible)
             OR (
-                @modo_busqueda = 1
+                @modo_busqueda = 1 AND @buscar_nombre = 1
                 AND (
                     FREETEXT((f.nombre, f.descripcion_general, f.descripcion_detallada,
                                f.descripcion_estado_orig, f.contexto_geologico,
@@ -616,12 +625,13 @@ BEGIN
                         ), @search_ft))
                 )
             )
+            -- Modo 2: CHARINDEX (subcadena, sin dependencia de Full-Text)
             OR (
-                @modo_busqueda = 2
+                @modo_busqueda = 2 AND @buscar_nombre = 1
                 AND (
-                    CHARINDEX(@nombre, f.nombre) > 0
+                    CHARINDEX(@nombre, f.nombre)             > 0
                     OR CHARINDEX(@nombre, f.descripcion_general) > 0
-                    OR (f.descripcion_detallada  IS NOT NULL AND CHARINDEX(@nombre, f.descripcion_detallada)  > 0)
+                    OR (f.descripcion_detallada   IS NOT NULL AND CHARINDEX(@nombre, f.descripcion_detallada)   > 0)
                     OR (f.descripcion_estado_orig IS NOT NULL AND CHARINDEX(@nombre, f.descripcion_estado_orig) > 0)
                     OR (f.contexto_geologico      IS NOT NULL AND CHARINDEX(@nombre, f.contexto_geologico)      > 0)
                     OR (f.descripcion_ubicacion   IS NOT NULL AND CHARINDEX(@nombre, f.descripcion_ubicacion)   > 0)
