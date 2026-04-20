@@ -1,14 +1,17 @@
-require('dotenv').config();
+require("dotenv").config();
 
-const jwt = require('jsonwebtoken');
-const { pool } = require('../../config/db');
-const bcrypt = require('bcrypt');
+const jwt = require("jsonwebtoken");
+const bcrypt = require("bcrypt");
+const { pool } = require("../../config/db");
+const { revokeToken } = require("../../security/tokenStore");
+
+const BCRYPT_PREFIX = /^\$2[aby]\$/;
 
 const login = async (email, password) => {
-
-  // 🔎 1. Buscar usuario
-  const result = await pool.request()
-    .input('email', email)
+  const emailTrim = typeof email === "string" ? email.trim() : email;
+  const result = await pool
+    .request()
+    .input("email", emailTrim)
     .query(`
       SELECT id, email, password_hash
       FROM USUARIO
@@ -18,19 +21,21 @@ const login = async (email, password) => {
   const user = result.recordset[0];
 
   if (!user) {
-    throw new Error('Usuario no encontrado');
+    throw new Error("Credenciales inválidas");
   }
 
-  // 🔐 2. Validación (temporal)
-  const match = password === "Admin123!";
+  let match = false;
+  if (user.password_hash && BCRYPT_PREFIX.test(user.password_hash)) {
+    match = await bcrypt.compare(password, user.password_hash);
+  }
 
   if (!match) {
-    throw new Error('Contraseña incorrecta');
+    throw new Error("Credenciales inválidas");
   }
 
-  // 🔥 3. TRAER TODOS LOS ROLES
-  const rolesResult = await pool.request()
-    .input('user_id', user.id)
+  const rolesResult = await pool
+    .request()
+    .input("user_id", user.id)
     .query(`
       SELECT rol_id
       FROM USUARIO_ROL
@@ -38,16 +43,15 @@ const login = async (email, password) => {
       AND activo = 1
     `);
 
-  const roles = rolesResult.recordset.map(r => r.rol_id);
+  const roles = rolesResult.recordset.map((r) => r.rol_id);
 
-  // 🔐 4. TOKEN MULTIROL
   const token = jwt.sign(
     {
       id: user.id,
-      roles: roles   // 👈 🔥 IMPORTANTE
+      roles,
     },
     process.env.JWT_SECRET,
-    { expiresIn: '2h' }
+    { expiresIn: "8h" },
   );
 
   return {
@@ -55,9 +59,14 @@ const login = async (email, password) => {
     user: {
       id: user.id,
       email: user.email,
-      roles: roles   // 👈 también aquí
-    }
+      roles,
+    },
   };
 };
 
-module.exports = { login };
+const logout = async (token) => {
+  revokeToken(token);
+  return { mensaje: "Sesión cerrada" };
+};
+
+module.exports = { login, logout };

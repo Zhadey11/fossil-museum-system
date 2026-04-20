@@ -1,0 +1,91 @@
+openapi: 3.0.3
+info:
+  title: Fossil Museum API
+  version: 1.0.0
+  description: API REST del sistema de fósiles.
+servers:
+  - url: http://localhost:4000
+paths:
+  /api/health:
+    get:
+      summary: Estado de servicio
+      responses:
+        "200":
+          description: OK
+  /api/auth/login:
+    post:
+      summary: Iniciar sesión
+      requestBody:
+        required: true
+      responses:
+        "200":
+          description: Token JWT
+  /api/auth/logout:
+    post:
+      summary: Cerrar sesión
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Sesión cerrada
+  /api/fosiles:
+    get:
+      summary: Listar fósiles públicos
+      parameters:
+        - in: query
+          name: q
+          schema: { type: string }
+        - in: query
+          name: categoria_id
+          schema: { type: integer }
+        - in: query
+          name: era_id
+          schema: { type: integer }
+        - in: query
+          name: periodo_id
+          schema: { type: integer }
+        - in: query
+          name: ubicacion
+          schema: { type: string }
+        - in: query
+          name: page
+          schema: { type: integer }
+        - in: query
+          name: page_size
+          schema: { type: integer }
+      responses:
+        "200": { description: Lista de fósiles }
+    post:
+      summary: Crear fósil
+      security:
+        - bearerAuth: []
+      responses:
+        "200": { description: Fósil creado }
+  /api/fosiles/{id}:
+    get:
+      summary: Obtener ficha pública por ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200": { description: Ficha pública }
+  /api/multimedia/upload-fosil:
+    post:
+      summary: Subir archivos multimedia para fósil
+      security:
+        - bearerAuth: []
+      responses:
+        "200": { description: Archivos subidos }
+  /api/contacto:
+    post:
+      summary: Enviar mensaje de contacto
+      responses:
+        "200": { description: Mensaje recibido }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

@@ -28,7 +28,7 @@ const createTaxonomia = async (req, res) => {
     const data = await service.crearTaxonomia(req.body);
 
     res.json({
-      mensaje: 'Taxonomía creada 🧬',
+      mensaje: 'Taxonomía creada',
       data
     });
   } catch (error) {

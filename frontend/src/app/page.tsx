@@ -9,15 +9,17 @@ import {
   TIMELINE_BLOCKS,
   type TimelineBlock,
 } from "@/data/timeline";
+import { fetchFosilesPublic } from "@/lib/api";
+import { fosilCardFromApi } from "@/lib/fosilesDisplay";
 
 function TimelineCardLink({ block }: { block: TimelineBlock }) {
   return (
     <Link
-      href={`/catalogo?era=${block.id}`}
+      href={`/catalogo?periodo=${block.slug}`}
       className="tl-card"
-      aria-label={`Abrir el catálogo filtrado por ${block.eraLabel}`}
+      aria-label={`Abrir el catálogo filtrado por periodo ${block.nombrePeriodoDb}`}
     >
-      <p className="tl-era">{block.eraLabel}</p>
+      <p className="tl-era">{block.etiquetaPeriodo}</p>
       <h3 className="tl-name">{block.title}</h3>
       <p className="tl-desc">{block.description}</p>
       <span className="tl-card-cta">Explorar colección</span>
@@ -36,7 +38,24 @@ const galleryVariants = [
 
 const galleryDelays = [0, 100, 200, 300, 400, 500];
 
-export default function Home() {
+export default async function Home() {
+  const res = await fetchFosilesPublic();
+  const fromApi =
+    res.ok && res.data.length > 0
+      ? res.data.slice(0, 6).map((row, i) => fosilCardFromApi(row, i))
+      : null;
+
+  const galleryItems = fromApi
+    ? fromApi
+    : mockFossils.map((f) => ({
+        id: f.id,
+        name: f.name,
+        category: f.category,
+        imageSrc: f.image,
+        description: f.description,
+        fichaHref: `/fosil/${f.id}`,
+      }));
+
   return (
     <>
       <section id="hero">
@@ -119,22 +138,24 @@ export default function Home() {
             </h2>
             <div className="sec-rule" />
             <p className="sec-body">
-              Cada pieza es un capítulo; juntas cuentan la mayor historia jamás
-              escrita. Datos de muestra — búsqueda y filtros en otra capa.
+              {fromApi
+                ? "Piezas publicadas desde la API (hasta seis en portada)."
+                : "Cada pieza es un capítulo; con el backend activo se muestran datos reales. Si no hay API, se usan ejemplos locales."}
             </p>
           </Reveal>
         </div>
 
         <div className="gallery-grid">
-          {mockFossils.map((fossil, i) => (
+          {galleryItems.map((fossil, i) => (
             <GalleryCard
               key={fossil.id}
               name={fossil.name}
               category={fossil.category}
-              imageSrc={fossil.image}
+              imageSrc={fossil.imageSrc}
               description={fossil.description}
               variant={galleryVariants[i] ?? "default"}
               delayMs={galleryDelays[i] ?? 0}
+              fichaHref={fossil.fichaHref}
             />
           ))}
         </div>
@@ -190,7 +211,7 @@ export default function Home() {
             <p className="sec-body" style={{ margin: "0 auto" }}>
               De la primera vida compleja a la última gran extinción: hitos del
               planeta en un solo recorrido. Pulsa un hito para abrir el catálogo
-              filtrado por era (demo).
+              filtrado por periodo geológico (demo, alineado a PERIODO_GEOLOGICO).
             </p>
           </Reveal>
         </div>
@@ -199,7 +220,7 @@ export default function Home() {
           <div className="tl-line" aria-hidden />
 
           {TIMELINE_BLOCKS.map((block) => (
-            <Reveal key={block.id} className="tl-item">
+            <Reveal key={block.slug} className="tl-item">
               {block.cardSide === "left" ? (
                 <>
                   <div className="tl-left">

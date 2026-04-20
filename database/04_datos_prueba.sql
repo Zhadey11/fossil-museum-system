@@ -1,6 +1,16 @@
 USE FosilesDB;
 GO
 
+/*
+  Datos de prueba para FosilesDB.
+  Ejecutar despues de: 01_base_datos.sql, 02_tablas_principales.sql, 03_indices_vistas_sp.sql
+  (ver database/ORDEN_EJECUCION.txt).
+
+  PERIODO_GEOLOGICO.id por orden de INSERT (lineas INSERT periodos):
+  1 Cambrico, 2 Ordovicico, 3 Silurico, 4 Devonico, 5 Carbonifero, 6 Permico,
+  7 Triasico, 8 Jurasico, 9 Cretacico, ... (coincide con frontend src/data/timeline.ts).
+*/
+
 INSERT INTO ROL (nombre, descripcion) VALUES
 ('administrador', 'Acceso completo al sistema. CRUD de fosiles, gestion de usuarios y aprobacion de registros.'),
 ('investigador',  'Acceso a informacion cientifica detallada. Puede crear estudios y colaborar.'),
@@ -86,7 +96,9 @@ INSERT INTO TAXONOMIA (reino, filo, clase, orden, familia, genero, especie) VALU
 ('Animalia','Chordata','Reptilia','Crocodilia','Crocodylidae','Crocodylus','Crocodylus acutus');
 GO
 
-DECLARE @h VARCHAR(255) = 'pbkdf2_sha256$720000$dev$hash_placeholder';
+-- bcrypt (cost 10) para la contrasena de demostracion: Admin123!
+-- Si actualizas la contrasena, genera un nuevo hash con: node backend/scripts/gen-hash.js
+DECLARE @h VARCHAR(255) = '$2b$10$mbvLZgIYs7TEplb7n2vc8.04mWshzDpSfQaRt1KO3TNJXOF8mvgQO';
 
 INSERT INTO USUARIO (rol_id,nombre,apellido,email,password_hash,telefono,pais,profesion,centro_trabajo) VALUES
 (1,'Carlos',   'Mendez Solano',    'admin@fosilesdb.net',   @h,'+506 8888-0001','Costa Rica','Administrador de Sistemas', 'Centro de Investigacion Geologica CIG'),
@@ -179,20 +191,97 @@ UPDATE FOSIL SET taxonomia_id = 6  WHERE codigo_unico LIKE 'CRI-CAR-CAC-FOS-0000
 UPDATE FOSIL SET taxonomia_id = 11 WHERE codigo_unico LIKE 'CRI-GUA-SCR-PAL-00001';
 GO
 
-INSERT INTO MULTIMEDIA (fosil_id,tipo,subtipo,url,nombre_archivo,angulo,descripcion,es_principal,orden)
-SELECT f.id,'imagen','portada','/media/fosiles/f' + CAST(f.id AS VARCHAR) + '/portada.webp',
-    'portada.webp','frontal','Vista principal del especimen',1,1
-FROM FOSIL f WHERE f.deleted_at IS NULL AND f.estado IN ('publicado','en_revision');
+/*
+  MULTIMEDIA — archivos en repo: backend/images/fossiles/...
+  (requiere copiar las carpetas generales, mineralizados, rocas, paleontologico-especifico).
+  El API sirve /images/... y el front usa portada_url + galeria publica.
+*/
+DELETE m
+FROM MULTIMEDIA m
+INNER JOIN FOSIL f ON f.id = m.fosil_id
+WHERE f.deleted_at IS NULL
+  AND f.estado = 'publicado'
+  AND m.deleted_at IS NULL
+  AND f.id IN (1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 13, 14, 15);
+GO
 
-INSERT INTO MULTIMEDIA (fosil_id,tipo,subtipo,url,nombre_archivo,angulo,descripcion,es_principal,orden)
-SELECT f.id,'imagen','antes','/media/fosiles/f' + CAST(f.id AS VARCHAR) + '/antes.webp',
-    'antes.webp','campo','Estado al momento del hallazgo',0,2
-FROM FOSIL f WHERE f.deleted_at IS NULL AND f.estado IN ('publicado','en_revision');
-
-INSERT INTO MULTIMEDIA (fosil_id,tipo,subtipo,url,nombre_archivo,angulo,descripcion,es_principal,orden)
-SELECT f.id,'imagen','despues','/media/fosiles/f' + CAST(f.id AS VARCHAR) + '/despues.webp',
-    'despues.webp','lateral','Despues del proceso de limpieza',0,3
-FROM FOSIL f WHERE f.deleted_at IS NULL AND f.estado = 'publicado';
+INSERT INTO MULTIMEDIA (fosil_id, tipo, subtipo, url, nombre_archivo, formato, descripcion, es_principal, orden)
+VALUES
+(1, 'imagen', 'portada', '/images/fossiles/paleontologico-especifico/paleontologia-1-1024x576.jpg',
+ 'paleontologia-1-1024x576.jpg', 'jpeg',
+ 'Amonita en sedimentos: mano con pincel limpiando espiral fosilizada en arena. Ilustracion de trabajo de campo para el registro de mosasaurio.', 1, 0),
+(1, 'imagen', 'general', '/images/fossiles/paleontologico-especifico/paleontologists-carefully-excavating-a-tyrannosaurus-rex-fossil-skeleton-at-a-dig-site-photo.jpeg',
+ 'paleontologists-carefully-excavating-a-tyrannosaurus-rex-fossil-skeleton-at-a-dig-site-photo.jpeg', 'jpeg',
+ 'Excavacion al aire libre: craneo y costillas de Tyrannosaurus rex con cuadricula y brochas. Referencia de excavacion paleontologica.', 0, 1),
+(2, 'imagen', 'portada', '/images/fossiles/paleontologico-especifico/de-que-trabaja-un-paleontologo.jpg',
+ 'de-que-trabaja-un-paleontologo.jpg', 'jpeg',
+ 'Paleontologo en laboratorio con microscopio y material preparado. Contexto de estudio para vertebra de cetaceo.', 1, 0),
+(2, 'imagen', 'antes', '/images/fossiles/paleontologico-especifico/paleontologia-reforca-visao-biblica-da-criacao-do-mundo2.jpg',
+ 'paleontologia-reforca-visao-biblica-da-criacao-do-mundo2.jpg', 'jpeg',
+ 'Mesa de trabajo con publicaciones y material grafico sobre paleontologia y divulgacion.', 0, 1),
+(9, 'imagen', 'portada', '/images/fossiles/paleontologico-especifico/paleontologia-e1551662411437.jpg',
+ 'paleontologia-e1551662411437.jpg', 'jpeg',
+ 'Esqueleto de Stegosaurus en placa sedimentaria (vista lateral, placas y cola con espigas). Imagen de referencia; el registro catalogo es coral tabular.', 1, 0),
+(15, 'imagen', 'portada', '/images/fossiles/paleontologico-especifico/por-que-estudiar-paleontologia.jpg',
+ 'por-que-estudiar-paleontologia.jpg', 'jpeg',
+ 'Divulgacion: texto y elementos graficos sobre por que estudiar paleontologia.', 1, 0),
+(15, 'imagen', 'general', '/images/fossiles/paleontologico-especifico/paleontologia_que_es_y_que_estudia_6274_600.jpg',
+ 'paleontologia_que_es_y_que_estudia_6274_600.jpg', 'jpeg',
+ 'Infografia educativa: que es la paleontologia y que estudia.', 0, 1),
+(3, 'imagen', 'portada', '/images/fossiles/generales/260107-fosil-1-800x450-atiempo-780x450.jpg',
+ '260107-fosil-1-800x450-atiempo-780x450.jpg', 'jpeg',
+ 'Esqueleto articulado de sauropodo en cueva con equipo e iluminacion. No es helecho; imagen museografica de referencia para el registro de flora fosil.', 1, 0),
+(3, 'imagen', 'general', '/images/fossiles/generales/descarga.jpg',
+ 'descarga.jpg', 'jpeg',
+ 'Montaje museistico Apex The Stegosaurus: esqueleto completo con placas dorsales. Referencia exhibicion de fosiles.', 0, 1),
+(7, 'imagen', 'portada', '/images/fossiles/mineralizados/fosil.jpg',
+ 'fosil.jpg', 'jpeg',
+ 'Amonita enrollada en arenisca; costillas y espiral bien visibles. Adecuado como ilustracion para el registro de amonite.', 1, 0),
+(7, 'imagen', 'analisis', '/images/fossiles/mineralizados/Molde_interno_erosionado.jpg',
+ 'Molde_interno_erosionado.jpg', 'jpeg',
+ 'Amonita con suturas onduladas en matriz clara; detalle de preservacion y textura.', 0, 1),
+(10, 'imagen', 'portada', '/images/fossiles/generales/irritator-challengeri.jpg',
+ 'irritator-challengeri.jpg', 'jpeg',
+ 'Esqueleto montado de espinosaurido (hocico largo tipo cocodrilo, garras, veleta baja). Referencia museo para hoja fosil catalogada.', 1, 0),
+(10, 'imagen', 'despues', '/images/fossiles/generales/RPF-memoria-fossil-cranio-2024-09-1140.jpg',
+ 'RPF-memoria-fossil-cranio-2024-09-1140.jpg', 'jpeg',
+ 'Craneo y vertebras cervicales de Smilodon (dientes sable). Referencia vertebrados fosiles; no es dicotiledonea.', 0, 1),
+(4, 'imagen', 'portada', '/images/fossiles/mineralizados/Ammo_hueco.jpg',
+ 'Ammo_hueco.jpg', 'jpeg',
+ 'Par de medias amonitas pulidas y abiertas: camaras internas con relleno cristalino (tonos ambar). Referencia de mineralizacion en molusco fosil para cuarzo ahumado catalogado.', 1, 0),
+(4, 'imagen', 'general', '/images/fossiles/mineralizados/Que-es-un-fosil-8.jpg',
+ 'Que-es-un-fosil-8.jpg', 'jpeg',
+ 'Pez fosil (tipo Knightia) en placa ovalada; esqueleto ocre sobre matriz clara. Referencia de fosilizacion en lamina.', 0, 1),
+(8, 'imagen', 'portada', '/images/fossiles/mineralizados/shell-214745-1280-cke.jpg',
+ 'shell-214745-1280-cke.jpg', 'jpeg',
+ 'Moldes radiales de valva fosilizada (brachiopodo o bivalvo) en roca sedimentaria clara. Referencia texturas y moldes minerales para pirita cubica.', 1, 0),
+(8, 'imagen', 'antes', '/images/fossiles/mineralizados/tipos_de_fosilizacion_y_sus_caracteristicas_3313_600.jpg',
+ 'tipos_de_fosilizacion_y_sus_caracteristicas_3313_600.jpg', 'jpeg',
+ 'Material didactico sobre tipos de fosilizacion y sus caracteristicas.', 0, 1),
+(14, 'imagen', 'portada', '/images/fossiles/mineralizados/c3585bc75b6a327a04865eedf5ada051.jpg',
+ 'c3585bc75b6a327a04865eedf5ada051.jpg', 'jpeg',
+ 'Modelo o escaneo en escala de grises de caballito de mar fosilizado en fragmento de roca irregular. Referencia visual de fosil marino y relieve.', 1, 0),
+(14, 'imagen', 'analisis', '/images/fossiles/mineralizados/nuevo_dinosaurio_patagonia_argentina_carnivoro_5.jpg',
+ 'nuevo_dinosaurio_patagonia_argentina_carnivoro_5.jpg', 'jpeg',
+ 'Noticia o infografia sobre dinosaurio carnivoro en Patagonia (contexto divulgacion paleontologica).', 0, 1),
+(5, 'imagen', 'portada', '/images/fossiles/rocas/fosil-en-piedra.jpg',
+ 'fosil-en-piedra.jpg', 'jpeg',
+ 'Pequeno teropodo articulado en placa clara (craneo con dientes, patas, cola). Referencia de fosil en matriz rocosa para el registro de basalto catalogado.', 1, 0),
+(5, 'imagen', 'general', '/images/fossiles/rocas/vegetales-y-otros-fosiles-1024x1024_oEJg0Lp.jpg',
+ 'vegetales-y-otros-fosiles-1024x1024_oEJg0Lp.jpg', 'jpeg',
+ 'Varias piezas fosiles y restos vegetales sobre superficie (coleccion / mesa de trabajo).', 0, 1),
+(11, 'imagen', 'portada', '/images/fossiles/rocas/roca-fosil-magnetica-1-1080x675.jpg',
+ 'roca-fosil-magnetica-1-1080x675.jpg', 'jpeg',
+ 'Roca con inclusiones y aspecto de muestra de campo o laboratorio. Referencia para caliza bioclastica.', 1, 0),
+(11, 'imagen', 'escaneo', '/images/fossiles/rocas/GettyImages-1071562884fosils.webp',
+ 'GettyImages-1071562884fosils.webp', 'webp',
+ 'Textura o conjunto de fosiles en tonos claros (imagen tipo stock).', 0, 1),
+(13, 'imagen', 'portada', '/images/fossiles/mineralizados/fosil-2.jpg',
+ 'fosil-2.jpg', 'jpeg',
+ 'Trilobita oscura en matriz circular clara; cefalon, torax y pigidio visibles. Coincide con el registro catalogado (trilobite).', 1, 0),
+(13, 'imagen', 'general', '/images/fossiles/mineralizados/596d9e09da26a.jpg',
+ '596d9e09da26a.jpg', 'jpeg',
+ 'Ejemplar grande de trilobita rojiza con espina genal, sostenido con ambas manos; matriz preparada con marcas de preparacion.', 0, 1);
 GO
 
 INSERT INTO ESTUDIO_CIENTIFICO (fosil_id,investigador_id,titulo,contexto_objetivo,tipo_analisis,resultados,composicion,condiciones_hallazgo,publicado)

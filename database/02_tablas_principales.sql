@@ -61,6 +61,9 @@ CREATE TABLE FOSIL (
     CONSTRAINT FK_FOSIL_EXPLOR   FOREIGN KEY (explorador_id)    REFERENCES USUARIO(id),
     CONSTRAINT FK_FOSIL_ADMIN    FOREIGN KEY (administrador_id) REFERENCES USUARIO(id),
     CONSTRAINT CK_FOSIL_estado   CHECK (estado IN ('pendiente','publicado','rechazado','en_revision')),
+    CONSTRAINT CK_FOSIL_codigo_formato CHECK (
+      codigo_unico LIKE '[A-Z][A-Z][A-Z]-[A-Z][A-Z][A-Z]-[A-Z][A-Z][A-Z]-[A-Z][A-Z][A-Z]-[0-9][0-9][0-9][0-9][0-9]'
+    ),
     CONSTRAINT CK_FOSIL_coords   CHECK (
         (latitud IS NULL AND longitud IS NULL)
         OR (latitud BETWEEN -90 AND 90 AND longitud BETWEEN -180 AND 180)

@@ -45,6 +45,7 @@ CREATE TABLE PROVINCIA (
     activo  BIT         NOT NULL DEFAULT 1,
     CONSTRAINT PK_PROVINCIA        PRIMARY KEY (id),
     CONSTRAINT UQ_PROVINCIA_pais_codigo UNIQUE (pais_id, codigo),
+    CONSTRAINT CK_PROVINCIA_codigo      CHECK (codigo LIKE '[A-Z][A-Z][A-Z]'),
     CONSTRAINT FK_PROVINCIA_PAIS   FOREIGN KEY (pais_id) REFERENCES PAIS(id)
 );
 GO
@@ -57,6 +58,7 @@ CREATE TABLE CANTON (
     activo       BIT         NOT NULL DEFAULT 1,
     CONSTRAINT PK_CANTON        PRIMARY KEY (id),
     CONSTRAINT UQ_CANTON_prov_codigo UNIQUE (provincia_id, codigo),
+    CONSTRAINT CK_CANTON_codigo      CHECK (codigo LIKE '[A-Z][A-Z][A-Z]'),
     CONSTRAINT FK_CANTON_PROV   FOREIGN KEY (provincia_id) REFERENCES PROVINCIA(id)
 );
 GO
@@ -116,6 +118,8 @@ CREATE TABLE TAXONOMIA (
     especie    VARCHAR(200) NOT NULL,
     created_at DATETIME2    NOT NULL DEFAULT GETDATE(),
     CONSTRAINT PK_TAXONOMIA          PRIMARY KEY (id),
-    CONSTRAINT UQ_TAXONOMIA_completa UNIQUE (reino,filo,clase,orden,familia,genero,especie)
+    CONSTRAINT UQ_TAXONOMIA_completa UNIQUE (reino,filo,clase,orden,familia,genero,especie),
+    CONSTRAINT CK_TAXONOMIA_genero_no_vacio CHECK (LEN(LTRIM(RTRIM(genero))) > 0),
+    CONSTRAINT CK_TAXONOMIA_especie_no_vacia CHECK (LEN(LTRIM(RTRIM(especie))) > 0)
 );
 GO
