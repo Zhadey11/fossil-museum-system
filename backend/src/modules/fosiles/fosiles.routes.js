@@ -1,49 +1,49 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
 
-const auth = require('../../middlewares/auth');
-const checkRole = require('../../middlewares/roles');
+const auth = require("../../middlewares/auth");
+const checkRole = require("../../middlewares/roles");
 
-const controller = require('./fosiles.controller');
+const controller = require("./fosiles.controller");
 
-// ==============================
-// 🧪 TEST
-// ==============================
-router.get('/test', auth, (req, res) => {
+router.get("/test", auth, (req, res) => {
   res.json({
-    mensaje: 'Ruta fósiles OK 🔥',
-    user: req.user
+    mensaje: "Ruta fósiles OK",
+    user: req.user,
   });
 });
 
-// ==============================
-// 🔓 PÚBLICO - VER FÓSILES
-// ==============================
-router.get('/', controller.getFosiles);
+router.get(
+  "/mis-registros",
+  auth,
+  checkRole([1, 3]),
+  controller.getMisRegistros,
+);
 
-// ==============================
-// 🔐 ADMIN + INVESTIGADOR
-// ==============================
-router.get('/:id', auth, checkRole([1,2]), controller.getFosilById);
+router.get(
+  "/investigador/catalogo",
+  auth,
+  checkRole([2]),
+  controller.getInvestigadorCatalogo,
+);
 
-// ==============================
-// 🧭 ADMIN + EXPLORADOR (CREAR)
-// ==============================
-router.post('/', auth, checkRole([1,3]), controller.createFosil);
+router.get("/", controller.getFosiles);
 
-// ==============================
-// 👑 ADMIN
-// ==============================
-router.put('/:id', auth, checkRole([1]), controller.updateFosil);
+router.get(
+  "/:id/detalle",
+  auth,
+  checkRole([1, 2]),
+  controller.getDetalleCompleto,
+);
 
-router.delete('/:id', auth, checkRole([1]), controller.deleteFosil);
+router.get("/:id", controller.getFosilPublico);
 
-// ==============================
-// 🔬 ADMIN + INVESTIGADOR (DETALLE)
-// ==============================
-router.get('/:id/detalle', auth, checkRole([1,2]), controller.getDetalleCompleto);
+router.post("/", auth, checkRole([1, 3]), controller.createFosil);
 
-// CAMBIAR ESTADO (solo admin)
-router.put('/:id/estado', auth, checkRole([1]), controller.changeEstado);
+router.put("/:id", auth, checkRole([1, 3]), controller.updateFosil);
+
+router.delete("/:id", auth, checkRole([1]), controller.deleteFosil);
+
+router.put("/:id/estado", auth, checkRole([1]), controller.changeEstado);
 
 module.exports = router;

@@ -9,7 +9,9 @@ const aprobar = async (req, res) => {
     const data = await aprobarFosil(req.params.id, req.user.id);
     res.json(data);
   } catch (error) {
-    res.status(500).json({ error: 'Error al aprobar fósil' });
+    res.status(500).json({
+      error: error.message || "Error al aprobar fósil",
+    });
   }
 };
 
@@ -18,7 +20,9 @@ const rechazar = async (req, res) => {
     const data = await rechazarFosil(req.params.id, req.user.id);
     res.json(data);
   } catch (error) {
-    res.status(500).json({ error: 'Error al rechazar fósil' });
+    res.status(500).json({
+      error: error.message || "Error al rechazar fósil",
+    });
   }
 };
 
@@ -27,7 +31,9 @@ const pendientes = async (req, res) => {
     const data = await obtenerPendientes();
     res.json(data);
   } catch (error) {
-    res.status(500).json({ error: 'Error al obtener pendientes' });
+    res.status(500).json({
+      error: error.message || "Error al obtener pendientes",
+    });
   }
 };
 

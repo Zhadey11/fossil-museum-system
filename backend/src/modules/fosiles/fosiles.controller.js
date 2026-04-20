@@ -1,8 +1,6 @@
-const service = require('./fosiles.service');
+const service = require("./fosiles.service");
+const invService = require("../investigacion/investigacion.service");
 
-// ==============================
-// 🦴 GET FÓSILES
-// ==============================
 const getFosiles = async (req, res) => {
   try {
     const data = await service.obtenerFosiles(req.query);
@@ -12,15 +10,12 @@ const getFosiles = async (req, res) => {
   }
 };
 
-// ==============================
-// 🦴 GET POR ID
-// ==============================
-const getFosilById = async (req, res) => {
+const getFosilPublico = async (req, res) => {
   try {
-    const data = await service.obtenerFosilPorId(req.params.id);
+    const data = await service.obtenerFosilPublicoPorId(req.params.id);
 
     if (!data) {
-      return res.status(404).json({ error: 'Fósil no encontrado' });
+      return res.status(404).json({ error: "Fósil no encontrado" });
     }
 
     res.json(data);
@@ -29,15 +24,29 @@ const getFosilById = async (req, res) => {
   }
 };
 
-// ==============================
-// 🦴 DETALLE COMPLETO
-// ==============================
 const getDetalleCompleto = async (req, res) => {
   try {
+    const roles = req.user.roles || [];
+    const isAdmin = roles.includes(1);
+    const isInvestigador = roles.includes(2);
+
     const data = await service.obtenerDetalleCompleto(req.params.id);
 
     if (!data) {
-      return res.status(404).json({ error: 'Fósil no encontrado' });
+      return res.status(404).json({ error: "Fósil no encontrado" });
+    }
+
+    if (isInvestigador && !isAdmin) {
+      const ok = await invService.investigadorTieneAccesoAFosil(
+        req.user.id,
+        parseInt(req.params.id, 10),
+      );
+      if (!ok) {
+        return res.status(403).json({
+          error:
+            "No tenés autorización para el detalle científico de este fósil. Solicitá acceso desde el panel de investigación.",
+        });
+      }
     }
 
     res.json(data);
@@ -46,56 +55,54 @@ const getDetalleCompleto = async (req, res) => {
   }
 };
 
-// ==============================
-// 🦴 CREAR
-// ==============================
 const createFosil = async (req, res) => {
   try {
     const data = await service.crearFosil(req.body, req.user);
 
     res.json({
-      mensaje: 'Fósil creado 🦴',
-      data
+      mensaje: "Fósil creado",
+      data,
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-// ==============================
-// 🦴 UPDATE
-// ==============================
 const updateFosil = async (req, res) => {
   try {
-    await service.actualizarFosil(req.params.id, req.body);
+    const roles = req.user.roles || [];
+    const isAdmin = roles.includes(1);
+    const isExplorador = roles.includes(3);
+    if (!isAdmin && !isExplorador) {
+      return res.status(403).json({ error: "No autorizado" });
+    }
+    await service.actualizarFosil(req.params.id, req.body, {
+      isAdmin,
+      userId: req.user.id,
+    });
 
     res.json({
-      mensaje: 'Fósil actualizado 🔄',
-      id: req.params.id
+      mensaje: "Fósil actualizado",
+      id: req.params.id,
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    const code = error.statusCode || 500;
+    res.status(code).json({ error: error.message });
   }
 };
 
-// ==============================
-// 🦴 DELETE (SOFT)
-// ==============================
 const deleteFosil = async (req, res) => {
   try {
     await service.eliminarFosil(req.params.id);
 
     res.json({
-      mensaje: 'Fósil eliminado (soft) 🗑️'
+      mensaje: "Fósil eliminado (soft delete)",
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-// ==============================
-// 🦴 CAMBIAR ESTADO (ADMIN)
-// ==============================
 const changeEstado = async (req, res) => {
   try {
     const { estado } = req.body;
@@ -103,37 +110,49 @@ const changeEstado = async (req, res) => {
     const data = await service.cambiarEstadoFosil(req.params.id, estado);
 
     res.json({
-      mensaje: `Estado actualizado a ${estado} 🔄`,
-      data
+      mensaje: `Estado actualizado a ${estado}`,
+      data,
     });
-
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-// ==============================
-// 🦴 VER PENDIENTES (ADMIN)
-// ==============================
-const getPendientes = async (req, res) => {
+const getMisRegistros = async (req, res) => {
   try {
-    const data = await service.obtenerFosilesPendientes();
+    const isAdmin = req.user.roles.includes(1);
+    const data = isAdmin
+      ? await service.obtenerTodosFosilesGestion()
+      : await service.obtenerFosilesPorExplorador(req.user.id);
+
     res.json(data);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-// ==============================
-// EXPORTS
-// ==============================
+const getInvestigadorCatalogo = async (req, res) => {
+  try {
+    const roles = req.user.roles || [];
+    const isAdmin = roles.includes(1);
+    const data = await service.obtenerFosilesParaInvestigador(
+      req.user.id,
+      isAdmin,
+    );
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 module.exports = {
   getFosiles,
-  getFosilById,
+  getMisRegistros,
+  getInvestigadorCatalogo,
+  getFosilPublico,
   getDetalleCompleto,
-  getPendientes,
   createFosil,
   updateFosil,
   deleteFosil,
-  changeEstado
+  changeEstado,
 };

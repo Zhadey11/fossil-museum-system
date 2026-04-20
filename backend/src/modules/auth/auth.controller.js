@@ -1,4 +1,4 @@
-const service = require('./auth.service');
+const service = require("./auth.service");
 
 const login = async (req, res) => {
   try {
@@ -8,12 +8,22 @@ const login = async (req, res) => {
 
     res.json(result);
   } catch (error) {
-    console.error('🔥 ERROR REAL:', error.message);
+    console.error("Login error:", error.message);
 
     res.status(400).json({
-      error: error.message // 👈 IMPORTANTE
+      error: error.message,
     });
   }
 };
 
-module.exports = { login }; 
+const logout = async (req, res) => {
+  try {
+    const token = req.token || (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
+    const result = await service.logout(token);
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ error: error.message || "No se pudo cerrar sesión" });
+  }
+};
+
+module.exports = { login, logout };

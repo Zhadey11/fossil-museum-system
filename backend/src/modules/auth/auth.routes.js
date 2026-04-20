@@ -1,10 +1,10 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
+const auth = require("../../middlewares/auth");
 
-const controller = require('./auth.controller');
+const controller = require("./auth.controller");
 
-console.log('CONTROLLER:', controller); // 👈 déjalo solo temporal
-
-router.post('/login', controller.login);
+router.post("/login", controller.login);
+router.post("/logout", auth, controller.logout);
 
 module.exports = router;

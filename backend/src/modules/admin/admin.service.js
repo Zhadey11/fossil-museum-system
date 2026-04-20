@@ -1,10 +1,10 @@
-const { pool } = require('../../config/db');
+const { pool } = require("../../config/db");
 
-// ✅ APROBAR
 const aprobarFosil = async (id, adminId) => {
-  await pool.request()
-    .input('id', id)
-    .input('admin_id', adminId)
+  await pool
+    .request()
+    .input("id", id)
+    .input("admin_id", adminId)
     .query(`
       UPDATE FOSIL
       SET estado = 'publicado',
@@ -13,14 +13,14 @@ const aprobarFosil = async (id, adminId) => {
       WHERE id = @id
     `);
 
-  return { mensaje: 'Fósil aprobado ✅' };
+  return { mensaje: "Fósil aprobado" };
 };
 
-// ❌ RECHAZAR
 const rechazarFosil = async (id, adminId) => {
-  await pool.request()
-    .input('id', id)
-    .input('admin_id', adminId)
+  await pool
+    .request()
+    .input("id", id)
+    .input("admin_id", adminId)
     .query(`
       UPDATE FOSIL
       SET estado = 'rechazado',
@@ -29,10 +29,9 @@ const rechazarFosil = async (id, adminId) => {
       WHERE id = @id
     `);
 
-  return { mensaje: 'Fósil rechazado ❌' };
+  return { mensaje: "Fósil rechazado" };
 };
 
-// 📋 VER PENDIENTES
 const obtenerPendientes = async () => {
   const result = await pool.request().query(`
     SELECT id, nombre, estado, created_at
@@ -46,5 +45,5 @@ const obtenerPendientes = async () => {
 module.exports = {
   aprobarFosil,
   rechazarFosil,
-  obtenerPendientes
+  obtenerPendientes,
 };
