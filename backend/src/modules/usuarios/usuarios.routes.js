@@ -12,6 +12,7 @@ const {
   eliminarUsuario,
   obtenerRoles,
   actualizarRolesUsuario,
+  actualizarActivoUsuario,
 } = require("./usuarios.service");
 
 router.get("/", auth, checkRole([1]), async (req, res) => {
@@ -114,6 +115,18 @@ router.put("/:id/roles", auth, checkRole([1]), async (req, res) => {
   } catch (error) {
     console.error("ERROR UPDATE USUARIO ROLES:", error);
     res.status(500).json({ error: "Error al actualizar roles" });
+  }
+});
+
+router.patch("/:id/activo", auth, checkRole([1]), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const activo = Boolean(req.body?.activo);
+    await actualizarActivoUsuario(id, activo);
+    res.json({ mensaje: `Usuario ${activo ? "activado" : "desactivado"}`, id, activo });
+  } catch (error) {
+    console.error("ERROR UPDATE USUARIO ACTIVO:", error);
+    res.status(500).json({ error: "Error al cambiar estado del usuario" });
   }
 });
 

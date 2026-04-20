@@ -1,6 +1,33 @@
 import type { ApiFosilRow } from "./api";
 import { multimediaAbsUrl } from "./api";
 
+/** Nombres de archivo en `backend/images/instalaciones/` (servidos como `/images/instalaciones/...`). */
+function galeriaInstalacionesFiles(): string[] {
+  const raw = process.env.NEXT_PUBLIC_GALERIA_INSTALACIONES?.split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (raw && raw.length > 0) return raw;
+  return [
+    "galeria-01.jpg",
+    "galeria-02.jpg",
+    "galeria-03.jpg",
+    "galeria-04.jpg",
+    "galeria-05.jpg",
+    "galeria-06.jpg",
+  ];
+}
+
+/**
+ * Imagen de sala/instalación. Usa ruta relativa proxied por Next (`/__api-images/...` → API `/images/...`)
+ * para que funcione al abrir el front por IP de red (el navegador no debe pedir a `localhost:4000`).
+ */
+export function instalacionGaleriaUrl(index: number): string {
+  const files = galeriaInstalacionesFiles();
+  const name = files[Math.abs(index) % files.length];
+  const safe = encodeURIComponent(name);
+  return `/__api-images/instalaciones/${safe}`;
+}
+
 const PLACEHOLDER_IMAGES = [
   "/catalogo-imagenes/amonita.svg",
   "/catalogo-imagenes/trilobite.svg",

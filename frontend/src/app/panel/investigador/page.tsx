@@ -28,6 +28,7 @@ function InvestigadorContent() {
   const [okMsg, setOkMsg] = useState<string | null>(null);
   const [filtroNombre, setFiltroNombre] = useState("");
   const [filtroEstado, setFiltroEstado] = useState("");
+  const [tab, setTab] = useState<"solicitudes" | "investigando">("solicitudes");
 
   const refresh = useCallback(async () => {
     const cat = await fetchInvestigadorCatalogo();
@@ -125,6 +126,36 @@ function InvestigadorContent() {
           {okMsg}
         </p>
       ) : null}
+
+      <div className="flex gap-2" style={{ marginBottom: "1rem" }}>
+        <button
+          type="button"
+          className="rounded-sm border px-3 py-1.5 text-sm"
+          style={{
+            borderColor: "var(--border)",
+            background: tab === "solicitudes" ? "var(--amber)" : "var(--surface)",
+            color: tab === "solicitudes" ? "var(--ink)" : "var(--bone)",
+          }}
+          onClick={() => setTab("solicitudes")}
+        >
+          Solicitudes y catálogo público
+        </button>
+        <button
+          type="button"
+          className="rounded-sm border px-3 py-1.5 text-sm"
+          style={{
+            borderColor: "var(--border)",
+            background: tab === "investigando" ? "var(--amber)" : "var(--surface)",
+            color: tab === "investigando" ? "var(--ink)" : "var(--bone)",
+          }}
+          onClick={() => setTab("investigando")}
+        >
+          Mis fósiles en investigación
+        </button>
+      </div>
+
+      {tab === "solicitudes" ? (
+        <>
 
       <h2 className="sec-h" style={{ fontSize: "1.25rem", marginBottom: "0.75rem" }}>
         Nueva solicitud
@@ -248,71 +279,87 @@ function InvestigadorContent() {
           </table>
         </div>
       )}
+        </>
+      ) : null}
 
-      <h2 className="sec-h" style={{ fontSize: "1.25rem", marginBottom: "0.75rem" }}>
-        Tu catálogo autorizado ({rows.length})
-      </h2>
-      <div className="grid gap-2 sm:grid-cols-3" style={{ marginBottom: "0.75rem" }}>
-        <input
-          placeholder="Filtrar por nombre"
-          value={filtroNombre}
-          onChange={(e) => setFiltroNombre(e.target.value)}
-          className="rounded-sm border px-2 py-1.5 text-sm"
-          style={{ borderColor: "var(--border)", background: "var(--surface)" }}
-        />
-        <select
-          value={filtroEstado}
-          onChange={(e) => setFiltroEstado(e.target.value)}
-          className="rounded-sm border px-2 py-1.5 text-sm"
-          style={{ borderColor: "var(--border)", background: "var(--surface)" }}
-        >
-          <option value="">Todos los estados</option>
-          <option value="publicado">Publicado</option>
-          <option value="pendiente">Pendiente</option>
-          <option value="en_revision">En revisión</option>
-          <option value="rechazado">Rechazado</option>
-        </select>
-      </div>
-      {rowsFiltrados.length === 0 ? (
-        <p className="sec-body">
-          No tenés fósiles autorizados todavía. Enviá una solicitud y esperá la
-          aprobación del administrador.
-        </p>
-      ) : (
-        <div style={{ overflowX: "auto" }}>
-          <table className="panel-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Nombre</th>
-                <th>Estado</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {rowsFiltrados.map((r) => (
-                <tr key={r.id}>
-                  <td>{r.id}</td>
-                  <td>{r.nombre}</td>
-                  <td>{r.estado}</td>
-                  <td>
-                    <Link
-                      href={`/panel/investigador/fosil/${r.id}`}
-                      className="catalog-clear-filter"
-                    >
-                      Detalle científico
-                    </Link>
-                    {" · "}
-                    <Link href={`/fosil/${r.id}`} className="catalog-clear-filter">
-                      Ficha pública
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      {tab === "investigando" ? (
+        <>
+          <h2 className="sec-h" style={{ fontSize: "1.25rem", marginBottom: "0.75rem" }}>
+            Mis fósiles en investigación ({rows.length})
+          </h2>
+          <div className="grid gap-2 sm:grid-cols-3" style={{ marginBottom: "0.75rem" }}>
+            <input
+              placeholder="Filtrar por nombre"
+              value={filtroNombre}
+              onChange={(e) => setFiltroNombre(e.target.value)}
+              className="rounded-sm border px-2 py-1.5 text-sm"
+              style={{ borderColor: "var(--border)", background: "var(--surface)" }}
+            />
+            <select
+              value={filtroEstado}
+              onChange={(e) => setFiltroEstado(e.target.value)}
+              className="rounded-sm border px-2 py-1.5 text-sm"
+              style={{ borderColor: "var(--border)", background: "var(--surface)" }}
+            >
+              <option value="">Todos los estados</option>
+              <option value="publicado">Publicado</option>
+              <option value="pendiente">Pendiente</option>
+              <option value="en_revision">En revisión</option>
+              <option value="rechazado">Rechazado</option>
+            </select>
+          </div>
+          {rowsFiltrados.length === 0 ? (
+            <p className="sec-body">
+              No tenés fósiles autorizados todavía. Enviá una solicitud y esperá la
+              aprobación del administrador.
+            </p>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table className="panel-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Nombre</th>
+                    <th>Estado</th>
+                    <th>Código único</th>
+                    <th>Ubicación exacta</th>
+                    <th>Contexto geológico</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rowsFiltrados.map((r) => (
+                    <tr key={r.id}>
+                      <td>{r.id}</td>
+                      <td>{r.nombre}</td>
+                      <td>{r.estado}</td>
+                      <td>{r.codigo_unico || "—"}</td>
+                      <td>
+                        {r.latitud != null && r.longitud != null
+                          ? `${r.latitud}, ${r.longitud}`
+                          : "Sin coordenadas"}
+                      </td>
+                      <td>{r.contexto_geologico || "—"}</td>
+                      <td>
+                        <Link
+                          href={`/panel/investigador/fosil/${r.id}`}
+                          className="catalog-clear-filter"
+                        >
+                          Detalle científico
+                        </Link>
+                        {" · "}
+                        <Link href={`/fosil/${r.id}`} className="catalog-clear-filter">
+                          Ficha pública
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      ) : null}
     </>
   );
 }

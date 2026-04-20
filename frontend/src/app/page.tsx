@@ -4,13 +4,11 @@ import { DustParticles } from "@/components/DustParticles";
 import { GalleryCard } from "@/components/GalleryCard";
 import { HeroFossilSvg } from "@/components/HeroFossilSvg";
 import { Reveal } from "@/components/Reveal";
-import { mockFossils } from "@/data/mockFossils";
+import { itemsGaleriaInstalaciones } from "@/data/instalacionesGaleria";
 import {
   TIMELINE_BLOCKS,
   type TimelineBlock,
 } from "@/data/timeline";
-import { fetchFosilesPublic } from "@/lib/api";
-import { fosilCardFromApi } from "@/lib/fosilesDisplay";
 
 function TimelineCardLink({ block }: { block: TimelineBlock }) {
   return (
@@ -39,22 +37,7 @@ const galleryVariants = [
 const galleryDelays = [0, 100, 200, 300, 400, 500];
 
 export default async function Home() {
-  const res = await fetchFosilesPublic();
-  const fromApi =
-    res.ok && res.data.length > 0
-      ? res.data.slice(0, 6).map((row, i) => fosilCardFromApi(row, i))
-      : null;
-
-  const galleryItems = fromApi
-    ? fromApi
-    : mockFossils.map((f) => ({
-        id: f.id,
-        name: f.name,
-        category: f.category,
-        imageSrc: f.image,
-        description: f.description,
-        fichaHref: `/fosil/${f.id}`,
-      }));
+  const galeriaLugar = itemsGaleriaInstalaciones();
 
   return (
     <>
@@ -132,30 +115,31 @@ export default async function Home() {
       <section id="gallery">
         <div className="gallery-intro">
           <Reveal>
-            <span className="sec-eyebrow">Colección destacada</span>
+            <span className="sec-eyebrow">El museo</span>
             <h2 className="sec-h">
-              Las galerías <em>permanentes</em>
+              Galerías y <em>espacios</em>
             </h2>
             <div className="sec-rule" />
             <p className="sec-body">
-              {fromApi
-                ? "Piezas publicadas desde la API (hasta seis en portada)."
-                : "Cada pieza es un capítulo; con el backend activo se muestran datos reales. Si no hay API, se usan ejemplos locales."}
+              Recorrido visual por salas y ambientes del museo: son fotos del lugar, no piezas del
+              catálogo fósil. Para cambiar las imágenes, usá la carpeta de instalaciones en el
+              servidor de medios del sistema.
             </p>
           </Reveal>
         </div>
 
         <div className="gallery-grid">
-          {galleryItems.map((fossil, i) => (
+          {galeriaLugar.map((espacio, i) => (
             <GalleryCard
-              key={fossil.id}
-              name={fossil.name}
-              category={fossil.category}
-              imageSrc={fossil.imageSrc}
-              description={fossil.description}
+              key={espacio.id}
+              name={espacio.titulo}
+              category={espacio.subtitulo}
+              imageSrc={espacio.imageSrc}
+              description={espacio.descripcion}
               variant={galleryVariants[i] ?? "default"}
               delayMs={galleryDelays[i] ?? 0}
-              fichaHref={fossil.fichaHref}
+              fichaHref={espacio.href}
+              linkLabel="Conocer espacio"
             />
           ))}
         </div>

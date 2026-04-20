@@ -103,28 +103,80 @@ export function ExploradorNuevoFosil({ onCreated, onQueueUpdated }: Props) {
     );
   }
 
-  function onUsarGPS() {
+  function getCurrentPositionAsync(
+    options: PositionOptions,
+  ): Promise<GeolocationPosition> {
+    return new Promise((resolve, reject) => {
+      navigator.geolocation!.getCurrentPosition(resolve, reject, options);
+    });
+  }
+
+  function geoErrorMessage(err: GeolocationPositionError | Error): string {
+    if ("code" in err && typeof err.code === "number") {
+      switch (err.code) {
+        case 1:
+          return "Permiso denegado: permití la ubicación para este sitio en la configuración del navegador, o ingresá coordenadas a mano.";
+        case 2:
+          return "Ubicación no disponible (GPS apagado o señal débil). Probá al aire libre o usá coordenadas manuales.";
+        case 3:
+          return "Tiempo agotado al pedir ubicación. Probá de nuevo o usá coordenadas manuales.";
+        default:
+          break;
+      }
+    }
+    const m = err instanceof Error ? err.message : "";
+    return m ? `No se pudo obtener GPS: ${m}` : "No se pudo obtener la ubicación.";
+  }
+
+  async function onUsarGPS() {
     if (typeof navigator === "undefined" || !navigator.geolocation) {
       setFormErr("Tu navegador no soporta geolocalización.");
       return;
     }
+    if (typeof window !== "undefined" && !window.isSecureContext) {
+      setFormErr(
+        "El navegador solo permite GPS en contexto seguro: https o http://localhost. Si abriste el sitio con la IP de tu red (http://192.168…), usá localhost, https o coordenadas manuales.",
+      );
+      return;
+    }
     setGeoBusy(true);
     setFormErr(null);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setLatitud(pos.coords.latitude.toFixed(7));
-        setLongitud(pos.coords.longitude.toFixed(7));
-        if (Number.isFinite(pos.coords.altitude || NaN)) {
-          setAltitud(String(pos.coords.altitude));
+    const apply = (pos: GeolocationPosition) => {
+      setLatitud(pos.coords.latitude.toFixed(7));
+      setLongitud(pos.coords.longitude.toFixed(7));
+      if (pos.coords.altitude != null && Number.isFinite(pos.coords.altitude)) {
+        setAltitud(String(pos.coords.altitude));
+      }
+    };
+    try {
+      const pos = await getCurrentPositionAsync({
+        enableHighAccuracy: false,
+        timeout: 22000,
+        maximumAge: 120000,
+      });
+      apply(pos);
+    } catch (e1) {
+      const c1 =
+        e1 && typeof e1 === "object" && "code" in e1
+          ? (e1 as GeolocationPositionError).code
+          : 0;
+      if (c1 === 2 || c1 === 3) {
+        try {
+          const pos = await getCurrentPositionAsync({
+            enableHighAccuracy: true,
+            timeout: 20000,
+            maximumAge: 0,
+          });
+          apply(pos);
+        } catch (e2) {
+          setFormErr(geoErrorMessage(e2 as GeolocationPositionError));
         }
-        setGeoBusy(false);
-      },
-      (err) => {
-        setGeoBusy(false);
-        setFormErr(`No se pudo obtener GPS: ${err.message}`);
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 120000 },
-    );
+      } else {
+        setFormErr(geoErrorMessage(e1 as GeolocationPositionError));
+      }
+    } finally {
+      setGeoBusy(false);
+    }
   }
 
   async function onSubmit(e: FormEvent) {
@@ -322,6 +374,10 @@ export function ExploradorNuevoFosil({ onCreated, onQueueUpdated }: Props) {
         >
           <p className="text-sm text-[var(--bonedim)]" style={{ marginBottom: "0.5rem" }}>
             Ubicación del hallazgo (GPS o manual)
+          </p>
+          <p className="text-xs text-[var(--bonedim)]/80" style={{ marginBottom: "0.5rem" }}>
+            Si el GPS no responde, comprobá permisos de ubicación y que la página esté en
+            localhost o https (en http por IP de red muchos navegadores lo bloquean).
           </p>
           <div className="flex flex-wrap gap-2" style={{ marginBottom: "0.6rem" }}>
             <button

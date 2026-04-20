@@ -237,6 +237,29 @@ const actualizarRolesUsuario = async (id, roles) => {
   return { id };
 };
 
+const actualizarActivoUsuario = async (id, activo) => {
+  const value = activo ? 1 : 0;
+  await pool
+    .request()
+    .input("id", id)
+    .input("activo", value)
+    .query(`
+      UPDATE USUARIO
+      SET activo = @activo,
+          updated_at = GETDATE()
+      WHERE id = @id
+        AND deleted_at IS NULL
+    `);
+  if (!value) {
+    await pool.request().input("usuario_id", id).query(`
+      UPDATE USUARIO_ROL
+      SET activo = 0
+      WHERE usuario_id = @usuario_id
+    `);
+  }
+  return { id, activo: !!value };
+};
+
 module.exports = {
   obtenerUsuarios,
   obtenerUsuarioPorId,
@@ -245,4 +268,5 @@ module.exports = {
   eliminarUsuario,
   obtenerRoles,
   actualizarRolesUsuario,
+  actualizarActivoUsuario,
 };

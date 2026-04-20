@@ -10,8 +10,10 @@ export function getApiBaseUrl(): string {
 
 export type ApiFosilRow = {
   id: number;
+  codigo_unico?: string;
   nombre: string;
   descripcion_general: string;
+  contexto_geologico?: string | null;
   categoria_id?: number;
   periodo_id?: number;
   era_id?: number;
@@ -366,6 +368,17 @@ export type EstudioFosilRow = {
   referencias?: { id: number; titulo: string; url: string; tipo?: string }[];
 };
 
+export type ContactoAdminRow = {
+  id: number;
+  nombre: string;
+  email: string;
+  asunto: string;
+  mensaje: string;
+  leido: boolean;
+  respondido: boolean;
+  created_at: string;
+};
+
 /** Solicitud de acceso a datos científicos (IDs del catálogo público + mensaje al admin). */
 export async function postSolicitudInvestigacion(body: {
   fosil_ids: number[];
@@ -462,6 +475,17 @@ export async function fetchAdminUsuarios(): Promise<UsuarioAdminRow[]> {
   return Array.isArray(data) ? data : [];
 }
 
+export async function fetchAdminContacto(): Promise<ContactoAdminRow[]> {
+  const res = await apiFetch("/api/contacto");
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(
+      typeof data.error === "string" ? data.error : "Error al cargar mensajes de contacto",
+    );
+  }
+  return Array.isArray(data) ? data : [];
+}
+
 export async function fetchRolesCatalogo(): Promise<UsuarioRolRow[]> {
   const res = await apiFetch("/api/usuarios/catalogo/roles");
   const data = await res.json().catch(() => ({}));
@@ -533,6 +557,23 @@ export async function deleteAdminUsuario(id: number): Promise<void> {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     throw new Error(typeof data.error === "string" ? data.error : "No se pudo eliminar usuario");
+  }
+}
+
+export async function patchAdminUsuarioActivo(
+  id: number,
+  activo: boolean,
+): Promise<void> {
+  const res = await apiFetch(`/api/usuarios/${id}/activo`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ activo }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(
+      typeof data.error === "string" ? data.error : "No se pudo actualizar el estado del usuario",
+    );
   }
 }
 

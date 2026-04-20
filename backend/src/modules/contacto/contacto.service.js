@@ -42,19 +42,35 @@ const enviarMensaje = async (data) => {
 
   const to = process.env.CONTACTO_INSTITUCIONAL_EMAIL;
   const tx = getTransporter();
+  let correoEnviado = false;
   if (to && tx) {
-    await tx.sendMail({
-      from: process.env.MAIL_FROM || process.env.MAIL_USER,
-      to,
-      subject: `[Contacto Museo] ${asunto}`,
-      text: `Nombre: ${nombre}\nEmail: ${email}\n\n${mensaje}`,
-    });
+    try {
+      await tx.sendMail({
+        from: process.env.MAIL_FROM || process.env.MAIL_USER,
+        to,
+        subject: `[Contacto Museo] ${asunto}`,
+        text: `Nombre: ${nombre}\nEmail: ${email}\n\n${mensaje}`,
+      });
+      correoEnviado = true;
+    } catch (mailErr) {
+      console.error("CONTACTO SMTP ERROR:", mailErr?.message || mailErr);
+    }
   }
 
   return {
     mensaje: "Mensaje enviado",
     correo_institucional: to || null,
+    correo_enviado: correoEnviado,
   };
 };
 
-module.exports = { enviarMensaje };
+const obtenerMensajes = async () => {
+  const result = await pool.request().query(`
+    SELECT id, nombre, email, asunto, mensaje, leido, respondido, created_at
+    FROM CONTACTO
+    ORDER BY created_at DESC, id DESC
+  `);
+  return result.recordset;
+};
+
+module.exports = { enviarMensaje, obtenerMensajes };

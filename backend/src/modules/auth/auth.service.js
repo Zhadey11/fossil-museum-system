@@ -13,7 +13,7 @@ const login = async (email, password) => {
     .request()
     .input("email", emailTrim)
     .query(`
-      SELECT id, email, password_hash
+      SELECT id, email, password_hash, activo
       FROM USUARIO
       WHERE email = @email AND deleted_at IS NULL
     `);
@@ -22,6 +22,9 @@ const login = async (email, password) => {
 
   if (!user) {
     throw new Error("Credenciales inválidas");
+  }
+  if (!user.activo) {
+    throw new Error("Usuario desactivado. Contacta a un administrador.");
   }
 
   let match = false;

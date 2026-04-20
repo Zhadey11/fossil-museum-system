@@ -13,8 +13,10 @@ type GalleryCardProps = {
   description?: string;
   variant?: GalleryCardVariant;
   delayMs?: number;
-  /** Enlace a la ficha del fósil (por defecto solo catálogo). */
+  /** Destino del enlace (ficha, historia, catálogo, etc.). */
   fichaHref?: string;
+  /** Texto del CTA (por defecto “Ver ficha”). */
+  linkLabel?: string;
 };
 
 export function GalleryCard({
@@ -25,6 +27,7 @@ export function GalleryCard({
   variant = "default",
   delayMs = 0,
   fichaHref = "/catalogo",
+  linkLabel = "Ver ficha",
 }: GalleryCardProps) {
   const extra = [variant === "tall" && "tall", variant === "wide" && "wide"]
     .filter(Boolean)
@@ -48,7 +51,7 @@ export function GalleryCard({
           <h3 className="gcard-name">{name}</h3>
           {description ? <p className="gcard-desc">{description}</p> : null}
           <Link href={fichaHref} className="gcard-link">
-            Ver ficha
+            {linkLabel}
             <svg viewBox="0 0 16 16" fill="none" aria-hidden>
               <path
                 d="M3 8h10M9 4l4 4-4 4"

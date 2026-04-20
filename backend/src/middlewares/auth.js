@@ -1,7 +1,8 @@
 const jwt = require("jsonwebtoken");
 const { isRevoked } = require("../security/tokenStore");
+const { pool } = require("../config/db");
 
-const authMiddleware = (req, res, next) => {
+const authMiddleware = async (req, res, next) => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader) {
@@ -18,6 +19,18 @@ const authMiddleware = (req, res, next) => {
       return res.status(401).json({ error: "Token revocado. Inicia sesión de nuevo." });
     }
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const userCheck = await pool
+      .request()
+      .input("id", decoded.id)
+      .query(`
+        SELECT id, activo, deleted_at
+        FROM USUARIO
+        WHERE id = @id
+      `);
+    const row = userCheck.recordset[0];
+    if (!row || row.deleted_at || !row.activo) {
+      return res.status(401).json({ error: "Usuario inactivo o eliminado" });
+    }
     req.token = token;
     req.user = decoded;
     next();

@@ -4,6 +4,7 @@ import { Fragment, useCallback, useEffect, useState } from "react";
 import { FosilMultimediaBlock } from "@/components/FosilMultimediaBlock";
 import { PanelGuard } from "@/components/PanelGuard";
 import {
+  fetchAdminContacto,
   deleteAdminUsuario,
   fetchAdminPendientes,
   fetchAdminSolicitudesInvestigacion,
@@ -15,6 +16,7 @@ import {
   patchAdminRechazar,
   patchAdminRechazarSolicitudInv,
   postAdminCrearUsuario,
+  patchAdminUsuarioActivo,
   putAdminActualizarUsuario,
 } from "@/lib/api";
 import type {
@@ -22,6 +24,7 @@ import type {
   AdminSolicitudInvRow,
   ApiFosilRow,
   UsuarioAdminRow,
+  ContactoAdminRow,
   UsuarioRolRow,
 } from "@/lib/api";
 import { NEED_ADMIN } from "@/lib/panelNeeds";
@@ -32,6 +35,7 @@ function AdminContent() {
   const [solInv, setSolInv] = useState<AdminSolicitudInvRow[] | null>(null);
   const [usuarios, setUsuarios] = useState<UsuarioAdminRow[] | null>(null);
   const [roles, setRoles] = useState<UsuarioRolRow[] | null>(null);
+  const [contactos, setContactos] = useState<ContactoAdminRow[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [busySolId, setBusySolId] = useState<number | null>(null);
@@ -43,20 +47,23 @@ function AdminContent() {
     password: "",
     roles: [] as number[],
   });
+  const [userSort, setUserSort] = useState<"newest" | "oldest" | "name">("newest");
 
   const refreshAll = useCallback(async () => {
-    const [p, t, s, u, r] = await Promise.all([
+    const [p, t, s, u, r, c] = await Promise.all([
       fetchAdminPendientes(),
       fetchMisRegistros(),
       fetchAdminSolicitudesInvestigacion().catch(() => [] as AdminSolicitudInvRow[]),
       fetchAdminUsuarios(),
       fetchRolesCatalogo(),
+      fetchAdminContacto().catch(() => [] as ContactoAdminRow[]),
     ]);
     setPend(p);
     setTodos(t);
     setSolInv(s);
     setUsuarios(u);
     setRoles(r);
+    setContactos(c);
   }, []);
   async function onCrearUsuario(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -115,6 +122,19 @@ function AdminContent() {
       await refreshAll();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Error al eliminar usuario");
+    } finally {
+      setBusyUsuarioId(null);
+    }
+  }
+
+  async function onToggleActivoUsuario(user: UsuarioAdminRow) {
+    setBusyUsuarioId(user.id);
+    setErr(null);
+    try {
+      await patchAdminUsuarioActivo(user.id, !user.activo);
+      await refreshAll();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Error al actualizar estado del usuario");
     } finally {
       setBusyUsuarioId(null);
     }
@@ -195,9 +215,26 @@ function AdminContent() {
     );
   }
 
-  if (pend === null || todos === null || solInv === null || usuarios === null || roles === null) {
+  if (
+    pend === null ||
+    todos === null ||
+    solInv === null ||
+    usuarios === null ||
+    roles === null ||
+    contactos === null
+  ) {
     return <p className="sec-body">Cargando panel de administración…</p>;
   }
+
+  const usuariosOrdenados = [...usuarios].sort((a, b) => {
+    if (userSort === "name") {
+      const an = `${a.nombre} ${a.apellido}`.toLowerCase();
+      const bn = `${b.nombre} ${b.apellido}`.toLowerCase();
+      return an.localeCompare(bn, "es");
+    }
+    if (userSort === "oldest") return a.id - b.id;
+    return b.id - a.id;
+  });
 
   return (
     <>
@@ -507,24 +544,41 @@ function AdminContent() {
         <p className="sec-body">No hay usuarios.</p>
       ) : (
         <div style={{ overflowX: "auto" }}>
+          <div style={{ marginBottom: "0.6rem" }}>
+            <label className="text-sm text-[var(--bonedim)]">
+              Orden:
+              <select
+                value={userSort}
+                onChange={(e) => setUserSort(e.target.value as "newest" | "oldest" | "name")}
+                className="ml-2 rounded-sm border px-2 py-1 text-sm"
+                style={{ borderColor: "var(--border)", background: "var(--surface)" }}
+              >
+                <option value="newest">Nuevos primero</option>
+                <option value="oldest">Orden por ID (asc)</option>
+                <option value="name">Nombre (A-Z)</option>
+              </select>
+            </label>
+          </div>
           <table className="panel-table">
             <thead>
               <tr>
                 <th>ID</th>
                 <th>Nombre</th>
                 <th>Email</th>
+                <th>Activo</th>
                 <th>Roles</th>
                 <th>Acciones</th>
               </tr>
             </thead>
             <tbody>
-              {usuarios.map((u) => (
+              {usuariosOrdenados.map((u) => (
                 <tr key={u.id}>
                   <td>{u.id}</td>
                   <td>
                     {u.nombre} {u.apellido}
                   </td>
                   <td>{u.email}</td>
+                  <td>{u.activo ? "Sí" : "No"}</td>
                   <td>
                     <div className="flex flex-wrap gap-2">
                       {roles.map((r) => (
@@ -544,6 +598,15 @@ function AdminContent() {
                     <button
                       type="button"
                       className="rounded-sm border px-2 py-1 text-sm"
+                      style={{ borderColor: "var(--border)" }}
+                      disabled={busyUsuarioId === u.id}
+                      onClick={() => onToggleActivoUsuario(u)}
+                    >
+                      {u.activo ? "Desactivar" : "Activar"}
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded-sm border px-2 py-1 text-sm"
                       style={{ borderColor: "var(--border)", color: "salmon" }}
                       disabled={busyUsuarioId === u.id}
                       onClick={() => onEliminarUsuario(u.id)}
@@ -551,6 +614,40 @@ function AdminContent() {
                       Eliminar
                     </button>
                   </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <h2 className="sec-h" style={{ fontSize: "1.25rem", margin: "2rem 0 0.75rem" }}>
+        Mensajes de contacto ({contactos.length})
+      </h2>
+      {contactos.length === 0 ? (
+        <p className="sec-body">Aún no hay mensajes en contacto.</p>
+      ) : (
+        <div style={{ overflowX: "auto" }}>
+          <table className="panel-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Nombre</th>
+                <th>Correo</th>
+                <th>Asunto</th>
+                <th>Mensaje</th>
+                <th>Fecha</th>
+              </tr>
+            </thead>
+            <tbody>
+              {contactos.map((m) => (
+                <tr key={m.id}>
+                  <td>{m.id}</td>
+                  <td>{m.nombre}</td>
+                  <td>{m.email}</td>
+                  <td>{m.asunto}</td>
+                  <td style={{ maxWidth: "24rem", whiteSpace: "pre-wrap" }}>{m.mensaje}</td>
+                  <td>{String(m.created_at)}</td>
                 </tr>
               ))}
             </tbody>
