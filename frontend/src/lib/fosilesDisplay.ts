@@ -1,32 +1,5 @@
-import type { ApiFosilRow } from "./api";
+import type { ApiFosilRow, CatalogoImagenRow } from "./api";
 import { multimediaAbsUrl } from "./api";
-
-/** Nombres de archivo en `backend/images/instalaciones/` (servidos como `/images/instalaciones/...`). */
-function galeriaInstalacionesFiles(): string[] {
-  const raw = process.env.NEXT_PUBLIC_GALERIA_INSTALACIONES?.split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  if (raw && raw.length > 0) return raw;
-  return [
-    "galeria-01.jpg",
-    "galeria-02.jpg",
-    "galeria-03.jpg",
-    "galeria-04.jpg",
-    "galeria-05.jpg",
-    "galeria-06.jpg",
-  ];
-}
-
-/**
- * Imagen de sala/instalación. Usa ruta relativa proxied por Next (`/__api-images/...` → API `/images/...`)
- * para que funcione al abrir el front por IP de red (el navegador no debe pedir a `localhost:4000`).
- */
-export function instalacionGaleriaUrl(index: number): string {
-  const files = galeriaInstalacionesFiles();
-  const name = files[Math.abs(index) % files.length];
-  const safe = encodeURIComponent(name);
-  return `/__api-images/instalaciones/${safe}`;
-}
 
 const PLACEHOLDER_IMAGES = [
   "/catalogo-imagenes/amonita.svg",
@@ -42,6 +15,20 @@ const CATEGORIA_LABEL: Record<number, string> = {
   2: "Mineral",
   3: "Roca",
   4: "Paleontológico",
+};
+
+const CATEGORIA_BADGE: Record<number, string> = {
+  1: "FOS",
+  2: "MIN",
+  3: "ROC",
+  4: "PAL",
+};
+
+const LABEL_BY_BADGE: Record<string, string> = {
+  FOS: "Fósil general",
+  MIN: "Mineral",
+  ROC: "Roca",
+  PAL: "Paleontológico",
 };
 
 export function categoryLabel(categoria_id?: number): string {
@@ -62,12 +49,63 @@ export function fosilCardFromApi(row: ApiFosilRow, index: number) {
     typeof row.portada_url === "string" && row.portada_url.length > 0
       ? multimediaAbsUrl(row.portada_url)
       : null;
+  const badgeFromCode = row.categoria_codigo?.trim().toUpperCase();
+  const badgeFromId = row.categoria_id ? CATEGORIA_BADGE[row.categoria_id] : undefined;
+  const badgeFromUnique = row.codigo_unico?.split("-")?.[3]?.trim().toUpperCase();
+  const categoryBadge =
+    badgeFromCode ||
+    badgeFromId ||
+    (badgeFromUnique && LABEL_BY_BADGE[badgeFromUnique] ? badgeFromUnique : undefined) ||
+    "FOS";
+  const resolvedCategoryLabel =
+    row.categoria_nombre ||
+    categoryLabel(row.categoria_id) ||
+    LABEL_BY_BADGE[categoryBadge] ||
+    "Colección";
   return {
     id: String(row.id),
     name: row.nombre,
-    category: categoryLabel(row.categoria_id),
+    category: resolvedCategoryLabel,
+    categoryBadge,
+    eraLabel: row.era_nombre || "Era no disponible",
     imageSrc: portada ?? placeholderImageForId(row.id + index),
+    fallbackSrc: placeholderImageForId(row.id + index),
     description: short,
+    originLabel: "Registro verificado",
     fichaHref: `/fosil/${row.id}`,
+  };
+}
+
+export function catalogImageCardFromApi(row: CatalogoImagenRow, index: number) {
+  const desc = row.imagen_descripcion?.trim() || row.descripcion_general?.trim() || "";
+  const short = desc && desc.length > 160 ? `${desc.slice(0, 157)}…` : desc || undefined;
+  const imageSrc =
+    typeof row.imagen_url === "string" && row.imagen_url.length > 0
+      ? multimediaAbsUrl(row.imagen_url)
+      : placeholderImageForId(row.id + index);
+  const badgeFromCode = row.categoria_codigo?.trim().toUpperCase();
+  const badgeFromId = row.categoria_id ? CATEGORIA_BADGE[row.categoria_id] : undefined;
+  const badgeFromUnique = row.codigo_unico?.split("-")?.[3]?.trim().toUpperCase();
+  const categoryBadge =
+    badgeFromCode ||
+    badgeFromId ||
+    (badgeFromUnique && LABEL_BY_BADGE[badgeFromUnique] ? badgeFromUnique : undefined) ||
+    "FOS";
+  const resolvedCategoryLabel =
+    row.categoria_nombre ||
+    (row.categoria_id ? categoryLabel(row.categoria_id) : null) ||
+    LABEL_BY_BADGE[categoryBadge] ||
+    "Colección";
+  return {
+    id: `${row.id}-${row.multimedia_id}`,
+    name: row.nombre,
+    category: resolvedCategoryLabel,
+    categoryBadge,
+    eraLabel: row.era_nombre || "Era no disponible",
+    imageSrc,
+    fallbackSrc: placeholderImageForId(row.id + index),
+    description: short,
+    originLabel: "Registro verificado",
+    fichaHref: row.id > 0 ? `/fosil/${row.id}` : undefined,
   };
 }

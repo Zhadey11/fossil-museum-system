@@ -71,6 +71,339 @@ paths:
           schema: { type: integer }
       responses:
         "200": { description: Ficha pública }
+    put:
+      summary: Actualizar fósil (admin o explorador dueño)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200": { description: Fósil actualizado }
+    delete:
+      summary: Soft-delete de fósil (admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200": { description: Fósil eliminado lógicamente }
+  /api/fosiles/{id}/detalle:
+    get:
+      summary: Obtener detalle científico completo
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200": { description: Detalle científico (roles admin/investigador) }
+        "403": { description: Sin autorización para este fósil }
+  /api/multimedia/publico/catalogo:
+    get:
+      summary: Listar imágenes públicas del catálogo (paginado)
+      parameters:
+        - in: query
+          name: q
+          schema: { type: string }
+        - in: query
+          name: categoria_id
+          schema: { type: integer }
+        - in: query
+          name: era_id
+          schema: { type: integer }
+        - in: query
+          name: periodo_id
+          schema: { type: integer }
+        - in: query
+          name: subtipo
+          schema: { type: string }
+        - in: query
+          name: page
+          schema: { type: integer }
+        - in: query
+          name: page_size
+          schema: { type: integer }
+      responses:
+        "200": { description: Lista de imágenes públicas }
+  /api/estudios:
+    get:
+      summary: Listar estudios científicos por fósil (requiere autorización)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: fosil_id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200": { description: Lista de estudios }
+        "403": { description: Sin acceso al fósil solicitado }
+  /api/fosiles/mis-registros:
+    get:
+      summary: Listar registros del explorador autenticado (o admin)
+      security:
+        - bearerAuth: []
+      responses:
+        "200": { description: Lista de registros propios }
+  /api/fosiles/investigador/catalogo:
+    get:
+      summary: Catálogo de investigación (autorizado)
+      security:
+        - bearerAuth: []
+      responses:
+        "200": { description: Lista de fósiles para investigación }
+  /api/fosiles/{id}/estado:
+    put:
+      summary: Cambiar estado de fósil (admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200": { description: Estado actualizado }
+  /api/multimedia/publico/fosil/{fosil_id}:
+    get:
+      summary: Galería pública de multimedia por fósil
+      parameters:
+        - in: path
+          name: fosil_id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200": { description: Multimedia pública del fósil }
+  /api/multimedia/fosil/{fosil_id}:
+    get:
+      summary: Listar multimedia de fósil (admin/explorador)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: fosil_id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200": { description: Multimedia del fósil }
+  /api/multimedia:
+    post:
+      summary: Crear registro multimedia manual (admin)
+      security:
+        - bearerAuth: []
+      responses:
+        "200": { description: Multimedia creada }
+  /api/multimedia/{id}:
+    delete:
+      summary: Eliminar multimedia (admin/explorador dueño)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200": { description: Multimedia eliminada }
+  /api/investigacion/solicitudes:
+    post:
+      summary: Crear solicitud de acceso a investigación
+      security:
+        - bearerAuth: []
+      responses:
+        "200": { description: Solicitud registrada }
+  /api/investigacion/mis-solicitudes:
+    get:
+      summary: Listar solicitudes del investigador autenticado
+      security:
+        - bearerAuth: []
+      responses:
+        "200": { description: Lista de solicitudes }
+  /api/usuarios:
+    get:
+      summary: Listar usuarios (admin)
+      security:
+        - bearerAuth: []
+      responses:
+        "200": { description: Lista de usuarios }
+    post:
+      summary: Crear usuario (admin)
+      security:
+        - bearerAuth: []
+      responses:
+        "200": { description: Usuario creado }
+  /api/usuarios/catalogo/roles:
+    get:
+      summary: Catálogo de roles (admin)
+      security:
+        - bearerAuth: []
+      responses:
+        "200": { description: Lista de roles }
+  /api/usuarios/{id}:
+    get:
+      summary: Obtener usuario por ID (admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200": { description: Usuario }
+    put:
+      summary: Actualizar usuario (admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200": { description: Usuario actualizado }
+    delete:
+      summary: Soft-delete usuario (admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200": { description: Usuario eliminado }
+  /api/usuarios/{id}/roles:
+    put:
+      summary: Reasignar roles de usuario (admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200": { description: Roles actualizados }
+  /api/usuarios/{id}/activo:
+    patch:
+      summary: Activar/desactivar usuario (admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200": { description: Estado actualizado }
+  /api/contacto:
+    get:
+      summary: Listar mensajes de contacto (admin)
+      security:
+        - bearerAuth: []
+      responses:
+        "200": { description: Lista de mensajes }
+    post:
+      summary: Enviar mensaje de contacto
+      responses:
+        "200": { description: Mensaje recibido }
+  /api/catalogos/fosil-form:
+    get:
+      summary: Catálogos para formulario de fósil (admin/explorador)
+      security:
+        - bearerAuth: []
+      responses:
+        "200": { description: Catálogos de apoyo }
+  /api/taxonomia:
+    get:
+      summary: Listar taxonomía (auth)
+      security:
+        - bearerAuth: []
+      responses:
+        "200": { description: Lista taxonómica }
+    post:
+      summary: Crear taxonomía (admin)
+      security:
+        - bearerAuth: []
+      responses:
+        "200": { description: Taxonomía creada }
+  /api/taxonomia/{id}:
+    get:
+      summary: Obtener taxonomía por ID (auth)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200": { description: Taxonomía }
+    delete:
+      summary: Eliminar taxonomía (admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200": { description: Taxonomía eliminada }
+  /api/geologia:
+    get:
+      summary: Listar información geológica (auth)
+      security:
+        - bearerAuth: []
+      responses:
+        "200": { description: Geología listada }
+  /api/ubicacion:
+    get:
+      summary: Listar ubicaciones (auth)
+      security:
+        - bearerAuth: []
+      responses:
+        "200": { description: Ubicaciones listadas }
+  /api/admin/fosiles/pendientes:
+    get:
+      summary: Listar fósiles pendientes de revisión
+      security:
+        - bearerAuth: []
+      responses:
+        "200": { description: Lista de pendientes }
+  /api/admin/fosiles/{id}/aprobar:
+    patch:
+      summary: Aprobar fósil pendiente
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200": { description: Fósil aprobado }
+  /api/admin/fosiles/{id}/rechazar:
+    patch:
+      summary: Rechazar fósil pendiente
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200": { description: Fósil rechazado }
   /api/multimedia/upload-fosil:
     post:
       summary: Subir archivos multimedia para fósil
@@ -78,11 +411,6 @@ paths:
         - bearerAuth: []
       responses:
         "200": { description: Archivos subidos }
-  /api/contacto:
-    post:
-      summary: Enviar mensaje de contacto
-      responses:
-        "200": { description: Mensaje recibido }
 components:
   securitySchemes:
     bearerAuth:

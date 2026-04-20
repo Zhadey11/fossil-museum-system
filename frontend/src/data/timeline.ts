@@ -3,8 +3,7 @@
  * - dbo.ERA_GEOLOGICA — eras (p. ej. Paleozoico id=4, Mesozoico id=5)
  * - dbo.PERIODO_GEOLOGICO — periodos bajo cada era (p. ej. Cambrico, Devonico…)
  *
- * Los `periodoId` y `eraGeologicaId` coinciden con el orden de INSERT en
- * `database/04_datos_prueba.sql` (IDENTITY desde 1).
+ * Los `periodoId` y `eraGeologicaId` corresponden a los catálogos de base de datos.
  *
  * URL del catálogo: ?periodo=<slug> donde slug = nombre en BD en minúsculas sin tilde
  * (coincide con lo que el backend puede mapear a PERIODO_GEOLOGICO.id).
@@ -118,7 +117,7 @@ export const TIMELINE_BLOCKS: readonly TimelineBlock[] = [
   },
 ] as const;
 
-/** Slug de URL → dbo.PERIODO_GEOLOGICO.id (seed `04_datos_prueba.sql`). */
+/** Slug de URL → dbo.PERIODO_GEOLOGICO.id. */
 export const PERIODO_ID_BY_SLUG: Record<PeriodoGeologicoSlug, number> =
   Object.fromEntries(TIMELINE_BLOCKS.map((b) => [b.slug, b.periodoId])) as Record<
     PeriodoGeologicoSlug,
@@ -140,7 +139,7 @@ export const PERIODO_CATALOG_INTRO: Record<
   cambrico: {
     eyebrow: "Filtrado por periodo (PERIODO_GEOLOGICO)",
     title: "Cambrico — explosión de la vida",
-    body: "Piezas demo etiquetadas con periodo_id acorde a la BD. El backend usará dbo.PERIODO_GEOLOGICO.",
+    body: "Piezas etiquetadas con periodo_id acorde a los catálogos geológicos del sistema.",
   },
   devonico: {
     eyebrow: "Filtrado por periodo (PERIODO_GEOLOGICO)",

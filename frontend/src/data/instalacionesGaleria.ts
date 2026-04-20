@@ -1,64 +1,58 @@
-import { instalacionGaleriaUrl } from "@/lib/fosilesDisplay";
+import fs from "node:fs";
+import path from "node:path";
+import { placeholderImageForId } from "@/lib/fosilesDisplay";
 
-/** Salas y espacios del edificio (fotos en `backend/images/instalaciones/`), no piezas de colección. */
+const ROOT_DIR = path.join(process.cwd(), "public", "images", "instalaciones");
+const IMG_EXT = new Set([".jpg", ".jpeg", ".png", ".webp", ".avif", ".gif"]);
+
 export type ItemGaleriaInstalacion = {
   id: string;
-  /** Título de la sala o espacio. */
   titulo: string;
-  /** Línea secundaria (p. ej. piso o tipo de sala). */
   subtitulo: string;
   descripcion?: string;
   href: string;
   imageSrc: string;
+  fallbackSrc: string;
 };
 
-const BASE: Omit<ItemGaleriaInstalacion, "imageSrc">[] = [
-  {
-    id: "i1",
-    titulo: "Vestíbulo y bienvenida",
-    subtitulo: "Planta baja",
-    descripcion:
-      "Punto de partida del recorrido: mapas, orientación y primera mirada al museo.",
-    href: "/historia",
-  },
-  {
-    id: "i2",
-    titulo: "Galería I — Orígenes",
-    subtitulo: "Colección permanente",
-    descripcion: "Primeras formas de vida y ambientes antiguos en vitrinas curadas.",
-    href: "/historia",
-  },
-  {
-    id: "i3",
-    titulo: "Sala de minerales",
-    subtitulo: "Geología viva",
-    href: "/catalogo",
-  },
-  {
-    id: "i4",
-    titulo: "Pasillo de grandes fósiles",
-    subtitulo: "Piezas monumentales",
-    descripcion: "Restos a tamaño natural y contextos de excavación.",
-    href: "/catalogo",
-  },
-  {
-    id: "i5",
-    titulo: "Laboratorio a la vista",
-    subtitulo: "Conservación",
-    descripcion: "Donde el equipo prepara y documenta material para exposición e investigación.",
-    href: "/historia",
-  },
-  {
-    id: "i6",
-    titulo: "Sala educativa",
-    subtitulo: "Talleres y visitas",
-    href: "/historia",
-  },
-];
+function humanize(text: string): string {
+  return text
+    .replace(/[-_]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function collectFiles(dir: string, baseRel = ""): string[] {
+  if (!fs.existsSync(dir)) return [];
+  const out: string[] = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const rel = baseRel ? `${baseRel}/${entry.name}` : entry.name;
+    const abs = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      out.push(...collectFiles(abs, rel));
+      continue;
+    }
+    const ext = path.extname(entry.name).toLowerCase();
+    if (!IMG_EXT.has(ext)) continue;
+    out.push(rel);
+  }
+  return out;
+}
 
 export function itemsGaleriaInstalaciones(): ItemGaleriaInstalacion[] {
-  return BASE.map((row, i) => ({
-    ...row,
-    imageSrc: instalacionGaleriaUrl(i),
-  }));
+  const files = collectFiles(ROOT_DIR).sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" }));
+  return files.map((rel, i) => {
+    const folder = rel.includes("/") ? rel.split("/")[0] : "instalaciones";
+    const filename = path.basename(rel, path.extname(rel));
+    return {
+      id: `inst-${i + 1}`,
+      titulo: humanize(filename),
+      subtitulo: humanize(folder),
+      descripcion: `Vista de ${humanize(folder)} en el Stonewake Museum.`,
+      href: "/galeria",
+      imageSrc: encodeURI(`/images/instalaciones/${rel}`),
+      fallbackSrc: placeholderImageForId(i + 1),
+    };
+  });
 }

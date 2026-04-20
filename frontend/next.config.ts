@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -11,14 +12,54 @@ function apiBase(): string {
   return (process.env.NEXT_PUBLIC_API_URL || defaultApi).replace(/\/$/, "");
 }
 
+function apiBaseForServerProxy(): string {
+  const raw = (process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL || defaultApi).replace(
+    /\/$/,
+    "",
+  );
+  try {
+    const u = new URL(raw);
+    if (u.hostname === "localhost") {
+      u.hostname = "127.0.0.1";
+      return u.toString().replace(/\/$/, "");
+    }
+  } catch {
+    /* ignore */
+  }
+  return raw;
+}
+
 /** Orígenes extra que pueden pedir `/_next/*` en dev (p. ej. http://192.168.x.x:3000 desde el móvil). */
 function allowedDevOrigins(): string[] {
   const raw = process.env.NEXT_ALLOWED_DEV_ORIGINS;
-  if (!raw?.trim()) return [];
-  return raw
+  const fromEnv = (raw || "")
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
+  const defaults = new Set<string>([
+    "localhost",
+    "127.0.0.1",
+  ]);
+  try {
+    const nets = os.networkInterfaces();
+    for (const list of Object.values(nets)) {
+      for (const addr of list || []) {
+        if (addr.family === "IPv4" && !addr.internal) {
+          defaults.add(addr.address);
+        }
+      }
+    }
+  } catch {
+    /* ignore and keep defaults */
+  }
+  for (const origin of fromEnv) {
+    try {
+      defaults.add(new URL(origin).hostname);
+    } catch {
+      defaults.add(origin);
+    }
+  }
+  return [...defaults];
 }
 
 function imageRemotePatterns(): NonNullable<
@@ -68,10 +109,15 @@ const nextConfig: NextConfig = {
     remotePatterns: imageRemotePatterns(),
   },
   async rewrites() {
+    const base = apiBaseForServerProxy();
     return [
       {
-        source: "/__api-images/:path*",
-        destination: `${apiBase()}/images/:path*`,
+        source: "/__api/:path*",
+        destination: `${base}/:path*`,
+      },
+      {
+        source: "/__api-media/:path*",
+        destination: `${base}/:path*`,
       },
     ];
   },

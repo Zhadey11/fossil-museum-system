@@ -108,11 +108,8 @@ function InvestigadorContent() {
         </h1>
         <div className="sec-rule" />
         <p className="sec-body" style={{ marginTop: "1rem" }}>
-          Elegí fósiles del <strong>catálogo público</strong> (por ID) y enviá
-          tu solicitud. El administrador la revisa; si la aprueba, aquí solo
-          verás esos registros con permiso para abrir el{" "}
-          <strong>detalle científico</strong>. Además se guarda un mensaje en{" "}
-          <strong>CONTACTO</strong> para el equipo (como registro tipo correo).
+          Seleccioná fósiles publicados y enviá tu solicitud para acceder al
+          detalle científico.
         </p>
       </header>
 
@@ -138,7 +135,7 @@ function InvestigadorContent() {
           }}
           onClick={() => setTab("solicitudes")}
         >
-          Solicitudes y catálogo público
+          Solicitudes
         </button>
         <button
           type="button"
@@ -166,7 +163,7 @@ function InvestigadorContent() {
         style={{ marginBottom: "2rem", maxWidth: "42rem" }}
       >
         <p style={{ marginBottom: "0.75rem", fontSize: "0.9rem", opacity: 0.9 }}>
-          Catálogo público — marcá los fósiles que necesitás estudiar:
+          Seleccioná los fósiles que necesitás estudiar:
         </p>
         <div
           style={{

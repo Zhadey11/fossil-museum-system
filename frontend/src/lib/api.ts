@@ -1,5 +1,3 @@
-import { AUTH_TOKEN_KEY } from "./auth";
-
 const DEFAULT_API = "http://localhost:4000";
 
 export function getApiBaseUrl(): string {
@@ -8,10 +6,24 @@ export function getApiBaseUrl(): string {
   );
 }
 
+function apiUrl(path: string): string {
+  const normalized = path.startsWith("/") ? path : `/${path}`;
+  if (typeof window !== "undefined") {
+    return `/__api${normalized}`;
+  }
+  return `${getApiBaseUrl()}${normalized}`;
+}
+
 export type ApiFosilRow = {
   id: number;
   codigo_unico?: string;
   nombre: string;
+  categoria_codigo?: string | null;
+  categoria_nombre?: string | null;
+  era_nombre?: string | null;
+  periodo_nombre?: string | null;
+  explorador_nombre?: string | null;
+  explorador_apellido?: string | null;
   descripcion_general: string;
   contexto_geologico?: string | null;
   categoria_id?: number;
@@ -21,8 +33,13 @@ export type ApiFosilRow = {
   longitud?: number | string | null;
   slug?: string | null;
   estado?: string;
+  fecha_hallazgo?: string | null;
+  total_count?: number;
   /** Primera imagen del registro MULTIMEDIA (solo lectura; rutas /images/... o /videos/...). */
   portada_url?: string | null;
+  pais?: string | null;
+  ubicacion?: string | null;
+  descripcion_ubicacion?: string | null;
 };
 
 export async function fetchFosilesPublic(params?: {
@@ -33,34 +50,63 @@ export async function fetchFosilesPublic(params?: {
   ubicacion?: string;
   page?: number;
   page_size?: number;
-}): Promise<{ ok: boolean; data: ApiFosilRow[]; error?: string }> {
-  const base = getApiBaseUrl();
-  const u = new URL("/api/fosiles", base);
-  if (params?.periodo_id != null) {
-    u.searchParams.set("periodo_id", String(params.periodo_id));
-  }
-  if (params?.era_id != null) u.searchParams.set("era_id", String(params.era_id));
-  if (params?.categoria_id != null) {
-    u.searchParams.set("categoria_id", String(params.categoria_id));
-  }
-  if (params?.q) u.searchParams.set("q", params.q);
-  if (params?.ubicacion) u.searchParams.set("ubicacion", params.ubicacion);
-  if (params?.page) u.searchParams.set("page", String(params.page));
-  if (params?.page_size) u.searchParams.set("page_size", String(params.page_size));
+}): Promise<{
+  ok: boolean;
+  data: ApiFosilRow[];
+  error?: string;
+  page: number;
+  page_size: number;
+  total: number;
+  has_next: boolean;
+}> {
+  const page = Math.max(1, params?.page ?? 1);
+  const pageSize = Math.max(1, params?.page_size ?? 24);
+  const sp = new URLSearchParams();
+  if (params?.periodo_id != null) sp.set("periodo_id", String(params.periodo_id));
+  if (params?.era_id != null) sp.set("era_id", String(params.era_id));
+  if (params?.categoria_id != null) sp.set("categoria_id", String(params.categoria_id));
+  if (params?.q) sp.set("q", params.q);
+  if (params?.ubicacion) sp.set("ubicacion", params.ubicacion);
+  if (params?.page) sp.set("page", String(params.page));
+  if (params?.page_size) sp.set("page_size", String(params.page_size));
+  const url = apiUrl(`/api/fosiles${sp.toString() ? `?${sp.toString()}` : ""}`);
   try {
-    const res = await fetch(u.toString(), {
+    const res = await fetch(url, {
       next: { revalidate: 30 },
+      credentials: "include",
     });
     if (!res.ok) {
-      return { ok: false, data: [], error: res.statusText };
+      return {
+        ok: false,
+        data: [],
+        error: res.statusText,
+        page,
+        page_size: pageSize,
+        total: 0,
+        has_next: false,
+      };
     }
     const data = await res.json();
-    return { ok: true, data: Array.isArray(data) ? data : [] };
+    const rows = Array.isArray(data) ? data : [];
+    const totalRaw = rows[0]?.total_count;
+    const total = Number.isFinite(Number(totalRaw)) ? Number(totalRaw) : rows.length;
+    return {
+      ok: true,
+      data: rows,
+      page,
+      page_size: pageSize,
+      total,
+      has_next: page * pageSize < total,
+    };
   } catch (e) {
     return {
       ok: false,
       data: [],
       error: e instanceof Error ? e.message : "fetch failed",
+      page,
+      page_size: pageSize,
+      total: 0,
+      has_next: false,
     };
   }
 }
@@ -68,10 +114,10 @@ export async function fetchFosilesPublic(params?: {
 export async function fetchFosilPublicById(
   id: string,
 ): Promise<ApiFosilRow | null> {
-  const base = getApiBaseUrl();
   try {
-    const res = await fetch(`${base}/api/fosiles/${encodeURIComponent(id)}`, {
+    const res = await fetch(apiUrl(`/api/fosiles/${encodeURIComponent(id)}`), {
       next: { revalidate: 30 },
+      credentials: "include",
     });
     if (!res.ok) return null;
     return res.json();
@@ -87,15 +133,16 @@ export async function postLogin(body: {
   const base = getApiBaseUrl();
   let res: Response;
   try {
-    res = await fetch(`${base}/api/auth/login`, {
+    res = await fetch(apiUrl("/api/auth/login"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify(body),
     });
   } catch (e) {
     const msg =
       e instanceof TypeError
-        ? `No se pudo conectar con el API (${base}). ¿Está el backend en marcha y NEXT_PUBLIC_API_URL correcto?`
+        ? `No se pudo conectar con el API. Verificá que el backend esté en marcha en el puerto 4000.`
         : e instanceof Error
           ? e.message
           : "Error de red";
@@ -124,8 +171,7 @@ export async function postContacto(body: {
   asunto: string;
   mensaje: string;
 }): Promise<unknown> {
-  const base = getApiBaseUrl();
-  const res = await fetch(`${base}/api/contacto`, {
+  const res = await fetch(apiUrl("/api/contacto"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -139,18 +185,76 @@ export async function postContacto(body: {
   return data;
 }
 
-async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
-  const base = getApiBaseUrl();
-  const url = `${base}${path.startsWith("/") ? path : `/${path}`}`;
-  const token =
-    typeof window !== "undefined"
-      ? localStorage.getItem(AUTH_TOKEN_KEY)
-      : null;
-  const headers = new Headers(init.headers);
-  if (token) {
-    headers.set("Authorization", `Bearer ${token}`);
+export type SuscriptorRow = {
+  id: number;
+  correo: string;
+  fecha_suscripcion: string;
+  activo: boolean | number;
+};
+
+export type SuscriptorHistorialRow = {
+  id: number;
+  tipo: string;
+  titulo: string;
+  enviados: number;
+  created_at: string;
+};
+
+export async function postSuscriptor(correo: string): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch(apiUrl("/api/suscriptores"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ correo }),
+    });
+  } catch (e) {
+    if (e instanceof TypeError) {
+      throw new Error("No se pudo conectar con el servidor para suscribirte.");
+    }
+    throw e;
   }
-  return fetch(url, { ...init, headers });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(typeof data.error === "string" ? data.error : "No se pudo suscribir");
+  }
+}
+
+export async function fetchAdminSuscriptores(): Promise<SuscriptorRow[]> {
+  const res = await apiFetch("/api/suscriptores");
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "No se pudieron cargar suscriptores");
+  return Array.isArray(data) ? data : [];
+}
+
+export async function patchAdminSuscriptorActivo(id: number, activo: boolean): Promise<void> {
+  const res = await apiFetch(`/api/suscriptores/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ activo }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "No se pudo actualizar suscriptor");
+}
+
+export async function deleteAdminSuscriptor(id: number): Promise<void> {
+  const res = await apiFetch(`/api/suscriptores/${id}`, { method: "DELETE" });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "No se pudo eliminar suscriptor");
+}
+
+export async function fetchAdminSuscriptoresHistorial(): Promise<SuscriptorHistorialRow[]> {
+  const res = await apiFetch("/api/suscriptores/historial");
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "No se pudo cargar historial");
+  return Array.isArray(data) ? data : [];
+}
+
+async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  const url = apiUrl(path);
+  const headers = new Headers(init.headers);
+  return fetch(url, { ...init, headers, credentials: "include" });
 }
 
 export async function fetchMisRegistros(): Promise<ApiFosilRow[]> {
@@ -268,6 +372,20 @@ export async function putActualizarFosil(
   return data as { mensaje: string; id: string };
 }
 
+export async function deleteAdminFosil(id: number | string): Promise<void> {
+  const res = await apiFetch(`/api/fosiles/${encodeURIComponent(String(id))}`, {
+    method: "DELETE",
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(
+      typeof data.error === "string"
+        ? data.error
+        : "No se pudo eliminar el fósil",
+    );
+  }
+}
+
 /** Detalle científico completo (roles administrador e investigador). */
 export async function fetchFosilDetalleCompleto(
   id: number | string,
@@ -345,7 +463,24 @@ export type UsuarioAdminRow = {
   pais?: string | null;
   profesion?: string | null;
   centro_trabajo?: string | null;
+  deleted_at?: string | null;
   roles?: UsuarioRolRow[];
+};
+
+export type PapeleraItem = {
+  id: number;
+  nombre?: string;
+  apellido?: string;
+  email?: string;
+  asunto?: string;
+  estado?: string;
+  deleted_at?: string | null;
+};
+
+export type PapeleraAdminRow = {
+  usuarios: PapeleraItem[];
+  fosiles: PapeleraItem[];
+  contacto: PapeleraItem[];
 };
 
 export type EstudioFosilRow = {
@@ -475,6 +610,28 @@ export async function fetchAdminUsuarios(): Promise<UsuarioAdminRow[]> {
   return Array.isArray(data) ? data : [];
 }
 
+export async function fetchAdminUsuariosPapelera(): Promise<UsuarioAdminRow[]> {
+  const res = await apiFetch("/api/usuarios/papelera");
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(typeof data.error === "string" ? data.error : "Error al cargar papelera de usuarios");
+  }
+  return Array.isArray(data) ? data : [];
+}
+
+export async function fetchAdminPapelera(): Promise<PapeleraAdminRow> {
+  const res = await apiFetch("/api/admin/papelera");
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(typeof data.error === "string" ? data.error : "Error al cargar papelera");
+  }
+  return {
+    usuarios: Array.isArray(data.usuarios) ? data.usuarios : [],
+    fosiles: Array.isArray(data.fosiles) ? data.fosiles : [],
+    contacto: Array.isArray(data.contacto) ? data.contacto : [],
+  };
+}
+
 export async function fetchAdminContacto(): Promise<ContactoAdminRow[]> {
   const res = await apiFetch("/api/contacto");
   const data = await res.json().catch(() => ({}));
@@ -484,6 +641,37 @@ export async function fetchAdminContacto(): Promise<ContactoAdminRow[]> {
     );
   }
   return Array.isArray(data) ? data : [];
+}
+
+export async function patchAdminContactoLeido(
+  id: number,
+  leido: boolean,
+): Promise<void> {
+  const res = await apiFetch(`/api/contacto/${id}/leido`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ leido }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(
+      typeof data.error === "string"
+        ? data.error
+        : "No se pudo actualizar lectura del mensaje",
+    );
+  }
+}
+
+export async function deleteAdminContacto(id: number): Promise<void> {
+  const res = await apiFetch(`/api/contacto/${id}`, {
+    method: "DELETE",
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(
+      typeof data.error === "string" ? data.error : "No se pudo eliminar el mensaje",
+    );
+  }
 }
 
 export async function fetchRolesCatalogo(): Promise<UsuarioRolRow[]> {
@@ -577,6 +765,46 @@ export async function patchAdminUsuarioActivo(
   }
 }
 
+export async function patchAdminRestaurarUsuario(id: number): Promise<void> {
+  const res = await apiFetch(`/api/usuarios/${id}/restaurar`, {
+    method: "PATCH",
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(typeof data.error === "string" ? data.error : "No se pudo restaurar usuario");
+  }
+}
+
+export async function patchAdminRestaurarPapeleraUsuario(id: number): Promise<void> {
+  const res = await apiFetch(`/api/admin/papelera/usuarios/${id}/restaurar`, {
+    method: "PATCH",
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(typeof data.error === "string" ? data.error : "No se pudo restaurar usuario");
+  }
+}
+
+export async function patchAdminRestaurarPapeleraFosil(id: number): Promise<void> {
+  const res = await apiFetch(`/api/admin/papelera/fosiles/${id}/restaurar`, {
+    method: "PATCH",
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(typeof data.error === "string" ? data.error : "No se pudo restaurar fósil");
+  }
+}
+
+export async function patchAdminRestaurarPapeleraContacto(id: number): Promise<void> {
+  const res = await apiFetch(`/api/admin/papelera/contacto/${id}/restaurar`, {
+    method: "PATCH",
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(typeof data.error === "string" ? data.error : "No se pudo restaurar mensaje");
+  }
+}
+
 export async function fetchEstudiosPorFosil(
   fosilId: number | string,
 ): Promise<EstudioFosilRow[]> {
@@ -595,7 +823,17 @@ export function multimediaAbsUrl(urlPath: string): string {
   }
   const base = getApiBaseUrl();
   const p = urlPath.startsWith("/") ? urlPath : `/${urlPath}`;
-  return `${base}${p}`;
+  const encodedPath = encodeURI(p);
+  // Proxy interno de Next para evitar problemas cuando el front se abre por IP LAN
+  // y NEXT_PUBLIC_API_URL usa localhost.
+  if (
+    p.startsWith("/images/") ||
+    p.startsWith("/videos/") ||
+    p.startsWith("/uploads/")
+  ) {
+    return `/__api-media${encodedPath}`;
+  }
+  return `${base}${encodedPath}`;
 }
 
 export type MultimediaRow = {
@@ -608,14 +846,102 @@ export type MultimediaRow = {
   es_principal?: boolean;
 };
 
+export type CatalogoImagenRow = {
+  multimedia_id: number;
+  imagen_url: string;
+  subtipo?: string;
+  imagen_descripcion?: string | null;
+  id: number;
+  nombre: string;
+  codigo_unico?: string;
+  descripcion_general?: string;
+  categoria_id?: number;
+  categoria_codigo?: string | null;
+  categoria_nombre?: string | null;
+  era_nombre?: string | null;
+  periodo_nombre?: string | null;
+};
+
+export async function fetchCatalogoPublicoImagenes(params?: {
+  periodo_id?: number;
+  era_id?: number;
+  categoria_id?: number;
+  subtipo?: string;
+  q?: string;
+  ubicacion?: string;
+  page?: number;
+  page_size?: number;
+  include_total?: boolean;
+}): Promise<{
+  ok: boolean;
+  data: CatalogoImagenRow[];
+  error?: string;
+  page: number;
+  page_size: number;
+  total: number;
+  has_next: boolean;
+}> {
+  const page = Math.max(1, params?.page ?? 1);
+  const pageSize = Math.max(1, params?.page_size ?? 24);
+  const sp = new URLSearchParams();
+  if (params?.periodo_id != null) sp.set("periodo_id", String(params.periodo_id));
+  if (params?.era_id != null) sp.set("era_id", String(params.era_id));
+  if (params?.categoria_id != null) sp.set("categoria_id", String(params.categoria_id));
+  if (params?.subtipo) sp.set("subtipo", params.subtipo);
+  if (params?.q) sp.set("q", params.q);
+  if (params?.ubicacion) sp.set("ubicacion", params.ubicacion);
+  sp.set("page", String(page));
+  sp.set("page_size", String(pageSize));
+  if (params?.include_total) sp.set("include_total", "1");
+  const url = apiUrl(`/api/multimedia/publico/catalogo?${sp.toString()}`);
+  try {
+    const res = await fetch(url, { next: { revalidate: 30 }, credentials: "include" });
+    if (!res.ok) {
+      return { ok: false, data: [], error: res.statusText, page, page_size: pageSize, total: 0, has_next: false };
+    }
+    const json = await res.json().catch(() => null);
+    const rows = Array.isArray(json)
+      ? json
+      : Array.isArray((json as { items?: unknown[] } | null)?.items)
+        ? ((json as { items: CatalogoImagenRow[] }).items)
+        : [];
+    const totalRaw = (json as { total?: unknown } | null)?.total;
+    const hasNextRaw = (json as { has_next?: unknown } | null)?.has_next;
+    const total = Number.isFinite(Number(totalRaw))
+      ? Number(totalRaw)
+      : page * pageSize + (rows.length > pageSize ? 1 : 0);
+    const hasNext =
+      typeof hasNextRaw === "boolean"
+        ? hasNextRaw
+        : rows.length >= pageSize && total > page * pageSize;
+    return {
+      ok: true,
+      data: rows,
+      page,
+      page_size: pageSize,
+      total,
+      has_next: hasNext,
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      data: [],
+      error: e instanceof Error ? e.message : "fetch failed",
+      page,
+      page_size: pageSize,
+      total: 0,
+      has_next: false,
+    };
+  }
+}
+
 /** Galería pública (solo fósiles publicados); sin token. */
 export async function fetchMultimediaFosilPublic(
   fosilId: number | string,
 ): Promise<MultimediaRow[]> {
-  const base = getApiBaseUrl();
   const res = await fetch(
-    `${base}/api/multimedia/publico/fosil/${encodeURIComponent(String(fosilId))}`,
-    { next: { revalidate: 30 } },
+    apiUrl(`/api/multimedia/publico/fosil/${encodeURIComponent(String(fosilId))}`),
+    { next: { revalidate: 30 }, credentials: "include" },
   );
   if (!res.ok) {
     return [];

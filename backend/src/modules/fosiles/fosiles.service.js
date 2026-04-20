@@ -7,25 +7,19 @@ const PUBLIC_COLUMNS = `
   f.categoria_id,
   f.era_id,
   f.periodo_id,
-  f.taxonomia_id,
-  f.explorador_id,
-  f.administrador_id,
   f.nombre,
   f.slug,
+  cf.codigo AS categoria_codigo,
+  cf.nombre AS categoria_nombre,
+  eg.nombre AS era_nombre,
+  pg.nombre AS periodo_nombre,
   f.descripcion_general,
-  f.descripcion_detallada,
-  f.descripcion_estado_orig,
-  f.contexto_geologico,
-  CAST(CASE WHEN f.latitud IS NULL THEN NULL ELSE ROUND(f.latitud, 2) END AS DECIMAL(10,7)) AS latitud,
-  CAST(CASE WHEN f.longitud IS NULL THEN NULL ELSE ROUND(f.longitud, 2) END AS DECIMAL(10,7)) AS longitud,
-  f.altitud_msnm,
   f.descripcion_ubicacion,
   f.estado,
   f.fecha_hallazgo,
-  f.fecha_aprobacion,
-  f.notas_revision,
   f.created_at,
-  f.updated_at,
+  f.latitud,
+  f.longitud,
   CASE WHEN f.latitud IS NOT NULL AND f.longitud IS NOT NULL THEN 1 ELSE 0 END AS tiene_coordenadas
 `;
 
@@ -33,6 +27,7 @@ const obtenerFosiles = async (query) => {
   const request = pool.request();
   let sql = `
     SELECT ${PUBLIC_COLUMNS},
+      COUNT(1) OVER() AS total_count,
       (
         SELECT TOP 1 m.url
         FROM MULTIMEDIA m
@@ -42,6 +37,9 @@ const obtenerFosiles = async (query) => {
         ORDER BY m.es_principal DESC, m.orden ASC, m.id ASC
       ) AS portada_url
     FROM FOSIL f
+    LEFT JOIN CATEGORIA_FOSIL cf ON cf.id = f.categoria_id
+    LEFT JOIN ERA_GEOLOGICA eg ON eg.id = f.era_id
+    LEFT JOIN PERIODO_GEOLOGICO pg ON pg.id = f.periodo_id
     WHERE f.deleted_at IS NULL
   `;
 
@@ -110,6 +108,9 @@ const obtenerFosilPublicoPorId = async (id) => {
           ORDER BY m.es_principal DESC, m.orden ASC, m.id ASC
         ) AS portada_url
       FROM FOSIL f
+      LEFT JOIN CATEGORIA_FOSIL cf ON cf.id = f.categoria_id
+      LEFT JOIN ERA_GEOLOGICA eg ON eg.id = f.era_id
+      LEFT JOIN PERIODO_GEOLOGICO pg ON pg.id = f.periodo_id
       WHERE f.id = @id
         AND f.deleted_at IS NULL
         AND f.estado = 'publicado'

@@ -66,11 +66,54 @@ const enviarMensaje = async (data) => {
 
 const obtenerMensajes = async () => {
   const result = await pool.request().query(`
-    SELECT id, nombre, email, asunto, mensaje, leido, respondido, created_at
-    FROM CONTACTO
-    ORDER BY created_at DESC, id DESC
+    IF COL_LENGTH('CONTACTO', 'deleted_at') IS NOT NULL
+    BEGIN
+      SELECT id, nombre, email, asunto, mensaje, leido, respondido, created_at
+      FROM CONTACTO
+      WHERE deleted_at IS NULL
+      ORDER BY created_at DESC, id DESC
+    END
+    ELSE
+    BEGIN
+      SELECT id, nombre, email, asunto, mensaje, leido, respondido, created_at
+      FROM CONTACTO
+      ORDER BY created_at DESC, id DESC
+    END
   `);
   return result.recordset;
 };
 
-module.exports = { enviarMensaje, obtenerMensajes };
+const marcarLeido = async (id, leido) => {
+  await pool
+    .request()
+    .input("id", id)
+    .input("leido", leido ? 1 : 0)
+    .query(`
+      UPDATE CONTACTO
+      SET leido = @leido
+      WHERE id = @id
+    `);
+  return { id, leido: !!leido };
+};
+
+const eliminarMensaje = async (id) => {
+  await pool
+    .request()
+    .input("id", id)
+    .query(`
+      IF COL_LENGTH('CONTACTO', 'deleted_at') IS NOT NULL
+      BEGIN
+        UPDATE CONTACTO
+        SET deleted_at = GETDATE()
+        WHERE id = @id
+      END
+      ELSE
+      BEGIN
+        DELETE FROM CONTACTO
+        WHERE id = @id
+      END
+    `);
+  return { id };
+};
+
+module.exports = { enviarMensaje, obtenerMensajes, marcarLeido, eliminarMensaje };

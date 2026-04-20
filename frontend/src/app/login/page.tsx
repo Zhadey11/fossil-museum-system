@@ -17,11 +17,8 @@ export default function LoginPage() {
           <h1 className="sec-h">Iniciar sesión</h1>
           <div className="sec-rule mx-auto" />
           <p className="sec-body mx-auto">
-            Tras cargar <code className="catalog-code">database/04_datos_prueba.sql</code>,
-            ejemplo: <strong>admin@fosilesdb.net</strong> /{" "}
-            <strong>Admin123!</strong> (misma clave para usuarios de prueba). El
-            backend debe estar en <code className="catalog-code">localhost:4000</code>{" "}
-            o en <code className="catalog-code">NEXT_PUBLIC_API_URL</code>.
+            Accedé con tu correo institucional y contraseña para gestionar
+            registros, revisión científica y administración del museo digital.
           </p>
         </header>
 

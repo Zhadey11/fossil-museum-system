@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { AUTH_TOKEN_KEY, clearAuth, getStoredUser } from "@/lib/auth";
+import { clearAuth, getStoredUser } from "@/lib/auth";
 import { postLogout } from "@/lib/api";
 import { panelPathForRoles } from "@/lib/roles";
 
@@ -11,19 +11,17 @@ export function NavAuth() {
   const pathname = usePathname();
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
-  const [token, setToken] = useState<string | null>(null);
+  const [isLogged, setIsLogged] = useState(false);
 
   useEffect(() => {
     setMounted(true);
-    setToken(
-      typeof window !== "undefined" ? localStorage.getItem(AUTH_TOKEN_KEY) : null,
-    );
+    setIsLogged(!!getStoredUser());
   }, [pathname]);
 
   async function logout() {
     await postLogout();
     clearAuth();
-    setToken(null);
+    setIsLogged(false);
     router.refresh();
     router.push("/");
   }
@@ -36,7 +34,7 @@ export function NavAuth() {
     );
   }
 
-  if (token) {
+  if (isLogged) {
     const user = getStoredUser();
     const panelHref = user ? panelPathForRoles(user.roles) : "/panel";
 

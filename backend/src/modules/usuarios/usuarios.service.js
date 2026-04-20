@@ -88,6 +88,25 @@ const obtenerUsuarios = async (query) => {
   }
 };
 
+const obtenerUsuariosEliminados = async () => {
+  const result = await pool.request().query(`
+    SELECT
+      u.id, u.nombre, u.apellido, u.email, u.rol_id, u.activo, u.created_at, u.deleted_at,
+      u.telefono, u.pais, u.profesion, u.centro_trabajo,
+      (
+        SELECT ur.rol_id AS id, r.nombre
+        FROM USUARIO_ROL ur
+        INNER JOIN ROL r ON r.id = ur.rol_id
+        WHERE ur.usuario_id = u.id
+        FOR JSON PATH
+      ) AS roles_json
+    FROM USUARIO u
+    WHERE u.deleted_at IS NOT NULL
+    ORDER BY u.deleted_at DESC, u.id DESC
+  `);
+  return result.recordset;
+};
+
 const crearUsuario = async (data) => {
   try {
     const plain = data.password;
@@ -222,6 +241,25 @@ const eliminarUsuario = async (id) => {
   }
 };
 
+const restaurarUsuario = async (id) => {
+  await pool
+    .request()
+    .input("id", id)
+    .query(`
+      UPDATE USUARIO
+      SET deleted_at = NULL,
+          activo = 1,
+          updated_at = GETDATE()
+      WHERE id = @id
+    `);
+  await pool.request().input("usuario_id", id).query(`
+    UPDATE USUARIO_ROL
+    SET activo = 1
+    WHERE usuario_id = @usuario_id
+  `);
+  return { id };
+};
+
 const obtenerRoles = async () => {
   const result = await pool.request().query(`
     SELECT id, nombre, descripcion
@@ -262,10 +300,12 @@ const actualizarActivoUsuario = async (id, activo) => {
 
 module.exports = {
   obtenerUsuarios,
+  obtenerUsuariosEliminados,
   obtenerUsuarioPorId,
   crearUsuario,
   actualizarUsuario,
   eliminarUsuario,
+  restaurarUsuario,
   obtenerRoles,
   actualizarRolesUsuario,
   actualizarActivoUsuario,

@@ -1,11 +1,38 @@
 const { pool } = require("../../config/db");
+const invService = require("../investigacion/investigacion.service");
 
-const obtenerEstudios = async (query = {}) => {
+const obtenerEstudios = async (query = {}, user = {}) => {
+  const roles = user.roles || [];
+  const isAdmin = roles.includes(1);
+  const isInvestigador = roles.includes(2);
+  if (!isAdmin && !isInvestigador) {
+    const e = new Error("No autorizado");
+    e.statusCode = 403;
+    throw e;
+  }
+
+  const fosilId = query.fosil_id ? parseInt(query.fosil_id, 10) : null;
+  if (!fosilId) {
+    const e = new Error("fosil_id es obligatorio");
+    e.statusCode = 400;
+    throw e;
+  }
+  if (!isAdmin) {
+    const ok = await invService.investigadorTieneAccesoAFosil(user.id, fosilId);
+    if (!ok) {
+      const e = new Error(
+        "No tenés autorización para los estudios de este fósil. Solicitá acceso desde el panel de investigación.",
+      );
+      e.statusCode = 403;
+      throw e;
+    }
+  }
+
   const req = pool.request();
   let where = "WHERE e.deleted_at IS NULL";
-  if (query.fosil_id) {
+  if (fosilId) {
     where += " AND e.fosil_id = @fosil_id";
-    req.input("fosil_id", parseInt(query.fosil_id, 10));
+    req.input("fosil_id", fosilId);
   }
   const result = await req.query(`
     SELECT

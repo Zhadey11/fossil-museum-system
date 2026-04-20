@@ -3,12 +3,11 @@ import Link from "next/link";
 import type { MapFossilPoint } from "@/data/mapFossils";
 import { MapaFosilesLoader } from "@/components/MapaFosilesLoader";
 import type { ApiFosilRow } from "@/lib/api";
-import { fetchFosilesPublic } from "@/lib/api";
+import { fetchFosilesPublic, multimediaAbsUrl } from "@/lib/api";
 
 export const metadata: Metadata = {
   title: "Mapa de hallazgos",
-  description:
-    "Explora en el mapa dónde se registraron fósiles publicados (API) o datos demo.",
+  description: "Explora en el mapa dónde se registraron fósiles publicados.",
 };
 
 function apiRowsToMapPoints(rows: ApiFosilRow[]): MapFossilPoint[] {
@@ -32,31 +31,36 @@ function apiRowsToMapPoints(rows: ApiFosilRow[]): MapFossilPoint[] {
         provincia: "Ver catálogo",
         resumen: desc.length > 120 ? `${desc.slice(0, 117)}…` : desc,
         descripcion: desc,
+        thumb: r.portada_url
+          ? multimediaAbsUrl(r.portada_url)
+          : "/images/FondoInicial.jpg",
+        categoria: r.categoria_codigo || "FOS",
       };
     });
 }
 
 export default async function MapaPage() {
-  const res = await fetchFosilesPublic();
-  const mapped =
-    res.ok && res.data.length > 0 ? apiRowsToMapPoints(res.data) : [];
-  const points = mapped.length > 0 ? mapped : undefined;
+  const rows: ApiFosilRow[] = [];
+  let page = 1;
+  let hasNext = true;
+  while (hasNext && page <= 20) {
+    const res = await fetchFosilesPublic({ page, page_size: 100 });
+    if (!res.ok) break;
+    rows.push(...res.data);
+    hasNext = res.has_next;
+    page += 1;
+  }
+  const points = apiRowsToMapPoints(rows);
 
   return (
     <div className="sw-page mapa-page" style={{ background: "var(--surface)" }}>
-      <section className="gallery-intro" style={{ paddingTop: "2rem" }}>
+      <section className="gallery-intro" style={{ paddingTop: "0.5rem", paddingBottom: "0.8rem" }}>
         <span className="sec-eyebrow">Georreferencia</span>
         <h1 className="sec-h">
           Mapa de <em>hallazgos</em>
         </h1>
         <div className="sec-rule" />
-        <p
-          className="sec-body"
-          style={{ margin: "1.6rem auto 0", maxWidth: "42rem" }}
-        >
-          Cada pin es un fósil publicado con coordenadas. Si la API no está
-          disponible, se muestran puntos de demostración.
-        </p>
+        <p className="sec-body" style={{ margin: "1rem auto 0", maxWidth: "42rem" }}>Cada pin representa un fósil publicado con coordenadas registradas.</p>
       </section>
 
       <section style={{ padding: "0 clamp(1rem, 4vw, 4rem) 4rem" }}>

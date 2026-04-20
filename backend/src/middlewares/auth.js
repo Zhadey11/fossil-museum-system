@@ -3,18 +3,22 @@ const { isRevoked } = require("../security/tokenStore");
 const { pool } = require("../config/db");
 
 const authMiddleware = async (req, res, next) => {
+  const cookieName = process.env.AUTH_COOKIE_NAME || "fossiles_token";
   const authHeader = req.headers.authorization;
+  const cookieToken = req.cookies?.[cookieName];
+  const token = authHeader?.startsWith("Bearer ")
+    ? authHeader.split(" ")[1]
+    : cookieToken;
 
-  if (!authHeader) {
+  if (!token) {
     return res.status(401).json({ error: "No autorizado" });
   }
 
-  if (!authHeader.startsWith("Bearer ")) {
+  if (authHeader && !authHeader.startsWith("Bearer ")) {
     return res.status(401).json({ error: "Formato de token inválido" });
   }
 
   try {
-    const token = authHeader.split(" ")[1];
     if (isRevoked(token)) {
       return res.status(401).json({ error: "Token revocado. Inicia sesión de nuevo." });
     }

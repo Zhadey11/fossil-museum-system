@@ -7,31 +7,25 @@ export const metadata: Metadata = {
 
 export default function ContactoPage() {
   return (
-    <div
-      className="sw-page flex min-h-screen flex-col items-center px-4 py-24"
-      style={{ background: "var(--ink)" }}
-    >
-      <div style={{ width: "100%", maxWidth: "520px" }}>
-        <header className="mb-10 text-center">
-          <span className="sec-eyebrow">Museo</span>
-          <h1 className="sec-h">Contacto</h1>
-          <div className="sec-rule mx-auto" />
-          <p className="sec-body mx-auto">
-            El mensaje se guarda en la base (tabla CONTACTO) y, si el backend
-            tiene SMTP configurado, también se envía al correo institucional
-            definido en <code className="catalog-code">CONTACTO_INSTITUCIONAL_EMAIL</code>.
-          </p>
-        </header>
-
-        <div
-          className="rounded-sm border p-8"
-          style={{
-            background: "var(--card)",
-            borderColor: "var(--border)",
-          }}
-        >
+    <div className="sw-page" style={{ background: "var(--ink)", padding: "7.5rem 1rem 3rem" }}>
+      <div className="contact-layout" style={{ maxWidth: "1120px", margin: "0 auto" }}>
+        <div className="rounded-sm border p-8" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
+          <header className="mb-8">
+            <span className="sec-eyebrow">Museo</span>
+            <h1 className="sec-h">Contáctanos</h1>
+            <div className="sec-rule" />
+          </header>
           <ContactForm />
         </div>
+        <aside className="rounded-sm border p-8" style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
+          <h2 className="sec-h" style={{ fontSize: "2rem" }}>Información del museo</h2>
+          <p className="sec-body">Escribinos por consultas académicas, visitas guiadas y alianzas institucionales.</p>
+          <div className="sec-rule" />
+          <p className="sec-body"><strong>Correo institucional:</strong><br />info@stonewake.org</p>
+          <p className="sec-body"><strong>Horario:</strong><br />Martes a domingo · 9:00 a 18:00</p>
+          <p className="sec-body"><strong>Redes:</strong><br />Instagram: @stonewakemuseum<br />Facebook: Stonewake Museum</p>
+          <p className="sec-body"><strong>Teléfono:</strong><br />(506) 2450-1100</p>
+        </aside>
       </div>
     </div>
   );

@@ -123,54 +123,70 @@ async function listarMisSolicitudes(investigadorId) {
     .request()
     .input("investigador_id", investigadorId)
     .query(`
-      SELECT s.id, s.asunto, s.estado, s.created_at, s.revisado_at, s.nota_admin
+      SELECT
+        s.id, s.asunto, s.estado, s.created_at, s.revisado_at, s.nota_admin,
+        f.id AS fosil_id, f.nombre AS fosil_nombre
       FROM SOLICITUD_INVESTIGACION s
+      LEFT JOIN SOLICITUD_INV_FOSIL sf ON sf.solicitud_id = s.id
+      LEFT JOIN FOSIL f ON f.id = sf.fosil_id
       WHERE s.investigador_id = @investigador_id
-      ORDER BY s.created_at DESC
+      ORDER BY s.created_at DESC, f.id ASC
     `);
 
-  const rows = result.recordset;
-  for (const row of rows) {
-    const r2 = await pool
-      .request()
-      .input("sid", row.id)
-      .query(`
-        SELECT f.id, f.nombre
-        FROM SOLICITUD_INV_FOSIL sf
-        INNER JOIN FOSIL f ON f.id = sf.fosil_id
-        WHERE sf.solicitud_id = @sid
-        ORDER BY f.id
-      `);
-    row.fosiles = r2.recordset;
+  const byId = new Map();
+  for (const row of result.recordset) {
+    if (!byId.has(row.id)) {
+      byId.set(row.id, {
+        id: row.id,
+        asunto: row.asunto,
+        estado: row.estado,
+        created_at: row.created_at,
+        revisado_at: row.revisado_at,
+        nota_admin: row.nota_admin,
+        fosiles: [],
+      });
+    }
+    if (row.fosil_id) {
+      byId.get(row.id).fosiles.push({ id: row.fosil_id, nombre: row.fosil_nombre });
+    }
   }
-  return rows;
+  return [...byId.values()];
 }
 
 async function listarSolicitudesPendientesAdmin() {
   const result = await pool.request().query(`
-    SELECT s.id, s.asunto, s.mensaje, s.estado, s.created_at,
-           u.nombre AS inv_nombre, u.apellido AS inv_apellido, u.email AS inv_email
+    SELECT
+      s.id, s.asunto, s.mensaje, s.estado, s.created_at,
+      u.nombre AS inv_nombre, u.apellido AS inv_apellido, u.email AS inv_email,
+      f.id AS fosil_id, f.nombre AS fosil_nombre
     FROM SOLICITUD_INVESTIGACION s
     INNER JOIN USUARIO u ON u.id = s.investigador_id
+    LEFT JOIN SOLICITUD_INV_FOSIL sf ON sf.solicitud_id = s.id
+    LEFT JOIN FOSIL f ON f.id = sf.fosil_id
     WHERE s.estado = 'pendiente'
-    ORDER BY s.created_at ASC
+    ORDER BY s.created_at ASC, f.id ASC
   `);
 
-  const rows = result.recordset;
-  for (const row of rows) {
-    const r2 = await pool
-      .request()
-      .input("sid", row.id)
-      .query(`
-        SELECT f.id, f.nombre
-        FROM SOLICITUD_INV_FOSIL sf
-        INNER JOIN FOSIL f ON f.id = sf.fosil_id
-        WHERE sf.solicitud_id = @sid
-        ORDER BY f.id
-      `);
-    row.fosiles = r2.recordset;
+  const byId = new Map();
+  for (const row of result.recordset) {
+    if (!byId.has(row.id)) {
+      byId.set(row.id, {
+        id: row.id,
+        asunto: row.asunto,
+        mensaje: row.mensaje,
+        estado: row.estado,
+        created_at: row.created_at,
+        inv_nombre: row.inv_nombre,
+        inv_apellido: row.inv_apellido,
+        inv_email: row.inv_email,
+        fosiles: [],
+      });
+    }
+    if (row.fosil_id) {
+      byId.get(row.id).fosiles.push({ id: row.fosil_id, nombre: row.fosil_nombre });
+    }
   }
-  return rows;
+  return [...byId.values()];
 }
 
 async function aprobarSolicitud(solicitudId, adminId) {

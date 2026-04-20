@@ -1,7 +1,4 @@
-/**
- * Datos demo para el mapa de hallazgos (lat/lng).
- * En producción vendrán de FOSIL + CANTON/PROVINCIA/PAIS (backend).
- */
+/** Estructura de puntos georreferenciados para visualización en mapa. */
 export type MapFossilPoint = {
   id: string;
   /** Coincide con futuro FOSIL.slug */
@@ -15,6 +12,8 @@ export type MapFossilPoint = {
   resumen: string;
   /** Texto largo para ficha */
   descripcion: string;
+  thumb?: string;
+  categoria?: string;
 };
 
 export const MAP_FOSSIL_POINTS: MapFossilPoint[] = [
@@ -28,7 +27,7 @@ export const MAP_FOSSIL_POINTS: MapFossilPoint[] = [
     provincia: "Cartago",
     resumen: "Cretácico marino — lutitas del Valle de Turrialba.",
     descripcion:
-      "Diente cónico bien preservado de mosasaurio. Hallado en afloramientos de lutita calcárea del Cretácico Superior. Coordenadas aproximadas de campo; la ficha completa incluirá fotos, estudios y referencias cuando exista API.",
+      "Diente cónico bien preservado de mosasaurio. Hallado en afloramientos de lutita calcárea del Cretácico Superior.",
   },
   {
     id: "m2",
@@ -92,27 +91,27 @@ export const MAP_FOSSIL_POINTS: MapFossilPoint[] = [
   },
   {
     id: "g1",
-    slug: "demo-guatemala-peten",
-    nombre: "Muestra paleontológica (demo Petén)",
+    slug: "guatemala-peten",
+    nombre: "Muestra paleontológica (Petén)",
     latitud: 16.9186,
     longitud: -89.9022,
     pais: "Guatemala",
     provincia: "Petén",
-    resumen: "Demo: punto en Guatemala para probar filtro por país.",
+    resumen: "Registro en Guatemala para cobertura regional del mapa.",
     descripcion:
-      "Coordenadas de referencia cerca de la región del Petén. En producción este registro vendría de la misma base que Costa Rica, con jerarquía país → provincia → cantón.",
+      "Coordenadas de referencia cerca de la región del Petén.",
   },
   {
     id: "g2",
-    slug: "demo-guatemala-quiche",
-    nombre: "Yacimiento demo (Quiché)",
+    slug: "guatemala-quiche",
+    nombre: "Yacimiento (Quiché)",
     latitud: 15.015,
     longitud: -91.1487,
     pais: "Guatemala",
     provincia: "Quiché",
-    resumen: "Demo: segundo hallazgo en Guatemala.",
+    resumen: "Segundo registro en Guatemala.",
     descripcion:
-      "Ejemplo de cómo el mapa puede mostrar solo pins de un país al filtrar. La ficha completa enlazará con multimedia y estudios.",
+      "Registro georreferenciado para consulta por país y provincia.",
   },
 ];
 

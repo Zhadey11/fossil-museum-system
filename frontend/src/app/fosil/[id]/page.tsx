@@ -7,8 +7,15 @@ import {
   fetchMultimediaFosilPublic,
   multimediaAbsUrl,
 } from "@/lib/api";
+import { FosilDetalleTabs } from "@/components/FosilDetalleTabs";
 
 type Props = { params: Promise<{ id: string }> };
+function formatDate(dateLike?: string | null): string {
+  if (!dateLike) return "—";
+  const d = new Date(dateLike);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("es-CR", { day: "2-digit", month: "short", year: "numeric" });
+}
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
@@ -33,13 +40,9 @@ export default async function FosilFichaPage({ params }: Props) {
 
   if (api) {
     const media = await fetchMultimediaFosilPublic(api.id);
-    const galeria = media.filter(
-      (m) => m.tipo === "imagen" || m.tipo === "video",
-    );
-
-    const lat = api.latitud != null ? Number(api.latitud) : NaN;
-    const lng = api.longitud != null ? Number(api.longitud) : NaN;
-    const hasCoords = Number.isFinite(lat) && Number.isFinite(lng);
+    const descubridor = [api.explorador_nombre, api.explorador_apellido]
+      .filter((x) => typeof x === "string" && x.trim().length > 0)
+      .join(" ");
 
     return (
       <div
@@ -47,119 +50,49 @@ export default async function FosilFichaPage({ params }: Props) {
         style={{ background: "var(--ink)" }}
       >
         <article
-          className="fosil-ficha-inner"
+          className="fosil-detail-wrap"
           style={{
-            maxWidth: "40rem",
+            maxWidth: "76rem",
             margin: "0 auto",
-            padding: "6rem clamp(1.25rem, 4vw, 2rem) 4rem",
+            padding: "4.8rem clamp(1.25rem, 4vw, 2rem) 3rem",
+            display: "grid",
+            gap: "1.25rem",
           }}
         >
-          <span className="sec-eyebrow">Ficha · FosilesDB</span>
-          <h1 className="sec-h" style={{ marginTop: "0.75rem" }}>
-            {api.nombre}
-          </h1>
-          <div className="sec-rule" />
-          {api.portada_url ? (
-            <div
-              style={{
-                marginTop: "1.25rem",
-                borderRadius: "8px",
-                overflow: "hidden",
-                border: "1px solid var(--border)",
-                maxHeight: "min(52vh, 22rem)",
-              }}
-            >
+          <Link href="/catalogo" className="catalog-back-link">← Volver a la colección</Link>
+          <section className="fossil-hero-grid">
+            <div className="fossil-main-visual">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={multimediaAbsUrl(api.portada_url)}
+                src={api.portada_url ? multimediaAbsUrl(api.portada_url) : "/catalogo-imagenes/amonita.svg"}
                 alt={`Portada · ${api.nombre}`}
-                className="block h-full w-full object-cover"
-                style={{ maxHeight: "min(52vh, 22rem)" }}
+                className="fossil-main-image"
                 loading="eager"
                 fetchPriority="high"
               />
+              <div className="fossil-main-overlay">
+                <h1>{api.nombre}</h1>
+                <div className="fossil-main-badges">
+                  <span>{api.categoria_nombre || "Categoría"}</span>
+                  <span>{api.era_nombre || "Era"}</span>
+                  <span>{api.estado || "Estado"}</span>
+                </div>
+              </div>
             </div>
-          ) : null}
-          {hasCoords ? (
-            <p className="sec-body" style={{ marginTop: "1.5rem" }}>
-              <strong>Coordenadas:</strong> {lat.toFixed(4)}, {lng.toFixed(4)}
-            </p>
-          ) : (
-            <p className="sec-body" style={{ marginTop: "1.5rem", opacity: 0.85 }}>
-              Ubicación sin coordenadas en el registro.
-            </p>
-          )}
-          <p className="sec-body" style={{ marginTop: "1rem" }}>
-            {api.descripcion_general}
-          </p>
-          {galeria.length > 0 ? (
-            <div
-              style={{
-                marginTop: "1.75rem",
-                display: "grid",
-                gap: "1rem",
-                gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
-              }}
-            >
-              {galeria.map((m) => (
-                <figure
-                  key={m.id}
-                  style={{
-                    margin: 0,
-                    border: "1px solid var(--border)",
-                    borderRadius: "6px",
-                    overflow: "hidden",
-                    background: "var(--surface)",
-                  }}
-                >
-                  {m.tipo === "video" ? (
-                    <video
-                      src={multimediaAbsUrl(m.url)}
-                      className="w-full bg-black object-contain"
-                      style={{ maxHeight: "200px" }}
-                      controls
-                      preload="metadata"
-                    />
-                  ) : (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={multimediaAbsUrl(m.url)}
-                      alt={m.descripcion || m.nombre_archivo || api.nombre}
-                      className="h-44 w-full object-cover"
-                      loading="lazy"
-                    />
-                  )}
-                  <figcaption
-                    className="sec-body"
-                    style={{
-                      fontSize: "0.75rem",
-                      padding: "0.35rem 0.5rem",
-                      opacity: 0.85,
-                    }}
-                  >
-                    {m.subtipo}
-                    {m.descripcion ? ` · ${m.descripcion}` : ""}
-                  </figcaption>
-                </figure>
-              ))}
-            </div>
-          ) : null}
-          <p className="fosil-ficha-actions">
-            <Link
-              href="/mapa"
-              className="btn-fill"
-              style={{ display: "inline-block" }}
-            >
-              Volver al mapa
-            </Link>
-            <Link
-              href="/catalogo"
-              className="btn-out"
-              style={{ display: "inline-block" }}
-            >
-              Ver catálogo
-            </Link>
-          </p>
+            <aside className="fossil-info-panel">
+              <h2>Resumen</h2>
+              <p>{api.descripcion_general || "Sin descripción disponible."}</p>
+              <p><strong>Ubicación:</strong> {api.ubicacion || api.descripcion_ubicacion || api.pais || "No disponible"}</p>
+              <p><strong>Fecha de hallazgo:</strong> {formatDate(api.fecha_hallazgo)}</p>
+              <p><strong>Encontrado por:</strong> {descubridor || "No disponible"}</p>
+            </aside>
+          </section>
+
+          <FosilDetalleTabs
+            fosilId={api.id}
+            media={media}
+            contextoGeologico={api.contexto_geologico}
+          />
         </article>
       </div>
     );
@@ -185,10 +118,6 @@ export default async function FosilFichaPage({ params }: Props) {
           {f.nombre}
         </h1>
         <div className="sec-rule" />
-        <p className="sec-body" style={{ marginTop: "1.5rem" }}>
-          <strong>Coordenadas (demo):</strong>{" "}
-          {f.latitud.toFixed(4)}, {f.longitud.toFixed(4)}
-        </p>
         <p className="sec-body" style={{ marginTop: "1rem" }}>
           {f.descripcion}
         </p>

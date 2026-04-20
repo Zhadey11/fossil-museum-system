@@ -3,6 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const { optimizarParaGuardar } = require("./multimedia.image");
 const service = require("./multimedia.service");
+const suscriptoresService = require("../suscriptores/suscriptores.service");
 
 function isVideoFile(file) {
   if (!file) return false;
@@ -25,6 +26,23 @@ function formatoDesdeExtension(ext) {
   const s = ext.replace(".", "").toLowerCase();
   if (s === "jpg") return "jpeg";
   return s || null;
+}
+
+function readUploadedFile(file) {
+  if (file?.buffer) return file.buffer;
+  if (file?.path && fs.existsSync(file.path)) {
+    return fs.readFileSync(file.path);
+  }
+  return null;
+}
+
+function cleanupTempFile(file) {
+  if (!file?.path) return;
+  try {
+    fs.unlinkSync(file.path);
+  } catch {
+    /* ignore */
+  }
 }
 
 const getMultimedia = async (req, res) => {
@@ -56,6 +74,17 @@ const getMultimediaPublico = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       error: error.message || "Error al listar multimedia",
+    });
+  }
+};
+
+const getCatalogoPublicoImagenes = async (req, res) => {
+  try {
+    const data = await service.obtenerCatalogoPublicoImagenes(req.query || {});
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({
+      error: error.message || "Error al listar catálogo público",
     });
   }
 };
@@ -118,6 +147,11 @@ const uploadParaFosil = async (req, res) => {
     const uploaded = [];
     for (const file of files) {
       const video = isVideoFile(file);
+      const inputBuffer = readUploadedFile(file);
+      if (!inputBuffer) {
+        cleanupTempFile(file);
+        return res.status(400).json({ error: "No se pudo leer el archivo subido" });
+      }
       let absPath;
       let url;
       let tipoMultimedia;
@@ -131,16 +165,17 @@ const uploadParaFosil = async (req, res) => {
         const absDir = path.join(process.cwd(), "videos", subdir);
         fs.mkdirSync(absDir, { recursive: true });
         absPath = path.join(absDir, baseName);
-        fs.writeFileSync(absPath, file.buffer);
+        fs.writeFileSync(absPath, inputBuffer);
         url = `/videos/${subdir}/${baseName}`;
         tipoMultimedia = "video";
         formato = formatoDesdeExtension(ext);
-        tamanoBytes = file.buffer.length;
+        tamanoBytes = inputBuffer.length;
       } else {
         let procesado;
         try {
-          procesado = await optimizarParaGuardar(file.buffer);
+          procesado = await optimizarParaGuardar(inputBuffer);
         } catch {
+          cleanupTempFile(file);
           return res.status(400).json({
             error:
               "No se pudo procesar la imagen. Comprobá que sea un archivo válido.",
@@ -174,6 +209,7 @@ const uploadParaFosil = async (req, res) => {
           orden: esPrimera ? 0 : undefined,
         });
       } catch (dbErr) {
+        cleanupTempFile(file);
         try {
           fs.unlinkSync(absPath);
         } catch {
@@ -182,6 +218,7 @@ const uploadParaFosil = async (req, res) => {
         throw dbErr;
       }
       uploaded.push({ id: data.id, url, tipo: tipoMultimedia });
+      cleanupTempFile(file);
     }
 
     res.json({
@@ -191,6 +228,13 @@ const uploadParaFosil = async (req, res) => {
       url: uploaded[0]?.url,
       tipo: uploaded[0]?.tipo,
     });
+    if (uploaded.some((u) => u.tipo === "imagen") && req.user?.rol_id === 1) {
+      await suscriptoresService.notificarActivos({
+        tipo: "galeria_actualizada",
+        titulo: "Nueva imagen en la galería",
+        cuerpo: "Se agregaron nuevas imágenes a la galería del museo.",
+      });
+    }
   } catch (error) {
     const code = error.statusCode || 500;
     res.status(code).json({
@@ -219,6 +263,7 @@ const deleteMultimedia = async (req, res) => {
 module.exports = {
   getMultimedia,
   getMultimediaPublico,
+  getCatalogoPublicoImagenes,
   createMultimedia,
   uploadParaFosil,
   deleteMultimedia,

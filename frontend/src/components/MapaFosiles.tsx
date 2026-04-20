@@ -1,9 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import {
-  MAP_FOSSIL_POINTS,
   type MapFossilPoint,
   paisesEnMapa,
   provinciasPorPais,
@@ -19,13 +17,11 @@ function escapeHtml(s: string): string {
 }
 
 type MapaFosilesProps = {
-  /** Si vienen de la API; si no, se usan datos demo en `mapFossils`. */
   points?: MapFossilPoint[];
 };
 
 export default function MapaFosiles({ points }: MapaFosilesProps) {
-  const basePoints = points ?? MAP_FOSSIL_POINTS;
-  const fromApi = Boolean(points && points.length > 0);
+  const basePoints = points ?? [];
 
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<import("leaflet").Map | null>(null);
@@ -60,7 +56,7 @@ export default function MapaFosiles({ points }: MapaFosilesProps) {
       const L = await import("leaflet");
       if (cancelled || !containerRef.current) return;
 
-      map = L.map(containerRef.current).setView([10.5, -85.2], 6);
+      map = L.map(containerRef.current).setView([9.7, -83.7], 8);
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         attribution: "&copy; OpenStreetMap",
       }).addTo(map);
@@ -89,7 +85,7 @@ export default function MapaFosiles({ points }: MapaFosilesProps) {
       const layer = layerRef.current!;
       layer.clearLayers();
       const whitePin = L.divIcon({
-        className: "map-pin-white",
+        className: "map-pin-gold",
         iconSize: [22, 22],
         iconAnchor: [11, 11],
         popupAnchor: [0, -10],
@@ -97,10 +93,7 @@ export default function MapaFosiles({ points }: MapaFosilesProps) {
 
       puntosFiltrados.forEach((p) => {
         const m = L.marker([p.latitud, p.longitud], { icon: whitePin });
-        m.bindPopup(
-          `<div class="map-popup-inner"><strong>${escapeHtml(p.nombre)}</strong><p>${escapeHtml(p.resumen)}</p><a class="map-popup-link" href="/fosil/${p.id}">Leer más →</a></div>`,
-          { maxWidth: 280 },
-        );
+        m.bindPopup(`<div class="map-popup-inner"><img class="map-popup-thumb" src="${escapeHtml((p as { thumb?: string }).thumb || "/images/FondoInicial.jpg")}" alt="${escapeHtml(p.nombre)}" /><strong>${escapeHtml(p.nombre)}</strong><span class="map-popup-badge">${escapeHtml((p as { categoria?: string }).categoria || "FOS")}</span><p>${escapeHtml(p.resumen)}</p><a class="map-popup-link" href="/fosil/${p.id}">Ver ficha →</a></div>`, { maxWidth: 280 });
         m.addTo(layer);
       });
 
@@ -161,18 +154,7 @@ export default function MapaFosiles({ points }: MapaFosilesProps) {
         </p>
       </div>
       <div ref={containerRef} className="mapa-fosiles-canvas" />
-      <p className="mapa-fosiles-note">
-        {fromApi
-          ? "Pines desde la API (fósiles publicados con coordenadas). País/provincia simplificados hasta enlazar jerarquía cantón → provincia."
-          : "Demo con datos estáticos. Con el backend activo se cargan coordenadas desde la API."}
-      </p>
-      <p className="mapa-fosiles-3d">
-        <strong>Sobre mapa 3D:</strong> un globo 3D (Cesium / Three.js) es posible
-        después; primero conviene cerrar flujo 2D + backend.{" "}
-        <Link href="/catalogo" className="catalog-clear-filter">
-          Ir al catálogo
-        </Link>
-      </p>
+      <p className="mapa-fosiles-note">Pins sincronizados desde registros publicados.</p>
     </div>
   );
 }

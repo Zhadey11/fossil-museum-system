@@ -1,6 +1,3 @@
-/** Clave del token JWT en localStorage (mismo valor en LoginForm y NavAuth). */
-export const AUTH_TOKEN_KEY = "fosiles_token";
-
 /** Usuario devuelto por POST /api/auth/login (persistido para UI y paneles). */
 export const AUTH_USER_KEY = "fosiles_user";
 
@@ -23,6 +20,5 @@ export function getStoredUser(): StoredUser | null {
 
 export function clearAuth(): void {
   if (typeof window === "undefined") return;
-  localStorage.removeItem(AUTH_TOKEN_KEY);
   localStorage.removeItem(AUTH_USER_KEY);
 }

@@ -10,6 +10,8 @@ const {
   crearUsuario,
   actualizarUsuario,
   eliminarUsuario,
+  restaurarUsuario,
+  obtenerUsuariosEliminados,
   obtenerRoles,
   actualizarRolesUsuario,
   actualizarActivoUsuario,
@@ -37,6 +39,21 @@ router.get("/catalogo/roles", auth, checkRole([1]), async (_req, res) => {
   } catch (error) {
     console.error("ERROR GET ROLES:", error);
     res.status(500).json({ error: "Error al obtener roles" });
+  }
+});
+
+router.get("/papelera", auth, checkRole([1]), async (_req, res) => {
+  try {
+    const usuarios = await obtenerUsuariosEliminados();
+    res.json(
+      usuarios.map((u) => ({
+        ...u,
+        roles: u.roles_json ? JSON.parse(u.roles_json) : [],
+      })),
+    );
+  } catch (error) {
+    console.error("ERROR GET USUARIOS PAPELERA:", error);
+    res.status(500).json({ error: "Error al obtener papelera de usuarios" });
   }
 });
 
@@ -100,6 +117,17 @@ router.delete("/:id", auth, checkRole([1]), async (req, res) => {
   } catch (error) {
     console.error("ERROR DELETE USUARIO:", error);
     res.status(500).json({ error: "Error al eliminar usuario" });
+  }
+});
+
+router.patch("/:id/restaurar", auth, checkRole([1]), async (req, res) => {
+  try {
+    const { id } = req.params;
+    await restaurarUsuario(id);
+    res.json({ mensaje: "Usuario restaurado", id });
+  } catch (error) {
+    console.error("ERROR RESTORE USUARIO:", error);
+    res.status(500).json({ error: "Error al restaurar usuario" });
   }
 });
 

@@ -12,6 +12,7 @@ const SUBTIPOS_VALIDOS = new Set([
   "escaneo",
 ]);
 
+
 const obtenerFosilExplorador = async (fosilId) => {
   const r = await pool
     .request()
@@ -83,6 +84,115 @@ const obtenerMultimediaPublico = async (fosil_id) => {
     return [];
   }
   return obtenerMultimedia(fosil_id);
+};
+
+/** Catálogo público por imagen: devuelve TODAS las imágenes publicadas con datos básicos del fósil. */
+const obtenerCatalogoPublicoImagenes = async (query) => {
+  const request = pool.request();
+  let whereSql = `
+    WHERE m.deleted_at IS NULL
+      AND f.deleted_at IS NULL
+      AND f.estado = 'publicado'
+      AND m.tipo = 'imagen'
+  `;
+  if (query.periodo_id) {
+    whereSql += " AND f.periodo_id = @periodo_id";
+    request.input("periodo_id", parseInt(query.periodo_id, 10));
+  }
+  if (query.era_id) {
+    whereSql += " AND f.era_id = @era_id";
+    request.input("era_id", parseInt(query.era_id, 10));
+  }
+  if (query.categoria_id) {
+    whereSql += " AND f.categoria_id = @categoria_id";
+    request.input("categoria_id", parseInt(query.categoria_id, 10));
+  }
+  if (query.q) {
+    whereSql += " AND (f.nombre LIKE @q OR f.descripcion_general LIKE @q OR f.codigo_unico LIKE @q OR m.url LIKE @q)";
+    request.input("q", `%${String(query.q).trim()}%`);
+  }
+  if (query.ubicacion) {
+    whereSql += ` AND (f.descripcion_ubicacion LIKE @ubic OR EXISTS (
+      SELECT 1
+      FROM CANTON c
+      INNER JOIN PROVINCIA p ON p.id = c.provincia_id
+      WHERE c.id = f.canton_id
+        AND (c.nombre LIKE @ubic OR p.nombre LIKE @ubic OR c.codigo LIKE @ubic OR p.codigo LIKE @ubic)
+    ))`;
+    request.input("ubic", `%${String(query.ubicacion).trim()}%`);
+  }
+  if (query.subtipo) {
+    whereSql += " AND m.subtipo = @subtipo";
+    request.input("subtipo", String(query.subtipo).trim());
+  }
+  const page = Math.max(1, parseInt(query.page, 10) || 1);
+  const pageSize = Math.min(100, Math.max(1, parseInt(query.page_size, 10) || 24));
+  const offset = (page - 1) * pageSize;
+  request.input("offset", offset).input("fetch_size", pageSize + 1);
+
+  const selectSql = `
+    SELECT
+      m.id AS multimedia_id,
+      m.url AS imagen_url,
+      m.subtipo,
+      m.descripcion AS imagen_descripcion,
+      f.id,
+      f.nombre,
+      f.codigo_unico,
+      f.descripcion_general,
+      f.categoria_id,
+      cf.codigo AS categoria_codigo,
+      cf.nombre AS categoria_nombre,
+      eg.nombre AS era_nombre,
+      pg.nombre AS periodo_nombre
+    FROM MULTIMEDIA m
+    INNER JOIN FOSIL f ON f.id = m.fosil_id
+    LEFT JOIN CATEGORIA_FOSIL cf ON cf.id = f.categoria_id
+    LEFT JOIN ERA_GEOLOGICA eg ON eg.id = f.era_id
+    LEFT JOIN PERIODO_GEOLOGICO pg ON pg.id = f.periodo_id
+    ${whereSql}
+    ORDER BY f.created_at DESC, m.es_principal DESC, m.orden ASC, m.id ASC
+    OFFSET @offset ROWS FETCH NEXT @fetch_size ROWS ONLY
+  `;
+  const result = await request.query(selectSql);
+  const rows = result.recordset || [];
+  const hasNext = rows.length > pageSize;
+  const items = hasNext ? rows.slice(0, pageSize) : rows;
+
+  const includeTotal =
+    query.include_total === "1" ||
+    query.include_total === "true" ||
+    query.include_total === 1 ||
+    query.include_total === true;
+  let total = null;
+  if (includeTotal) {
+    const countRequest = pool.request();
+    if (query.periodo_id) countRequest.input("periodo_id", parseInt(query.periodo_id, 10));
+    if (query.era_id) countRequest.input("era_id", parseInt(query.era_id, 10));
+    if (query.categoria_id) countRequest.input("categoria_id", parseInt(query.categoria_id, 10));
+    if (query.q) countRequest.input("q", `%${String(query.q).trim()}%`);
+    if (query.ubicacion) countRequest.input("ubic", `%${String(query.ubicacion).trim()}%`);
+    if (query.subtipo) countRequest.input("subtipo", String(query.subtipo).trim());
+    const countSql = `
+      SELECT COUNT(1) AS total
+      FROM MULTIMEDIA m
+      INNER JOIN FOSIL f ON f.id = m.fosil_id
+      LEFT JOIN CATEGORIA_FOSIL cf ON cf.id = f.categoria_id
+      LEFT JOIN ERA_GEOLOGICA eg ON eg.id = f.era_id
+      LEFT JOIN PERIODO_GEOLOGICO pg ON pg.id = f.periodo_id
+      ${whereSql}
+    `;
+    const countResult = await countRequest.query(countSql);
+    total = Number(countResult.recordset?.[0]?.total ?? 0);
+  }
+
+  return {
+    items,
+    page,
+    page_size: pageSize,
+    has_next: hasNext,
+    total,
+  };
 };
 
 const obtenerMultimediaPorId = async (id) => {
@@ -189,6 +299,7 @@ function formatoDesdeNombre(original) {
 module.exports = {
   obtenerMultimedia,
   obtenerMultimediaPublico,
+  obtenerCatalogoPublicoImagenes,
   contarMultimediaActiva,
   obtenerMultimediaPorId,
   crearMultimedia,

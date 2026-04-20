@@ -263,8 +263,12 @@ BEGIN
     IF @pais_codigo IS NULL OR @categoria_codigo IS NULL
         THROW 50001, 'Canton o categoria no validos.', 1;
 
+    /*
+      Evita colisiones por concurrencia en la generación del correlativo:
+      con UPDLOCK + HOLDLOCK la lectura de MAX(...) queda serializada dentro de la transacción llamadora.
+    */
     SELECT @siguiente_id = ISNULL(MAX(TRY_CAST(RIGHT(f.codigo_unico, 5) AS INT)), 0) + 1
-    FROM FOSIL f
+    FROM FOSIL f WITH (UPDLOCK, HOLDLOCK)
     WHERE f.canton_id = @canton_id AND f.categoria_id = @categoria_id;
 
     SET @codigo_unico = CONCAT(
@@ -452,8 +456,22 @@ BEGIN
             THROW 50002, 'Fosil no encontrado o eliminado.', 1;
 
         IF NOT EXISTS (
-            SELECT 1 FROM USUARIO u INNER JOIN ROL r ON u.rol_id = r.id
-            WHERE u.id = @admin_id AND r.nombre = 'administrador' AND u.deleted_at IS NULL
+            SELECT 1
+            FROM USUARIO u
+            LEFT JOIN ROL r_legacy ON r_legacy.id = u.rol_id
+            WHERE u.id = @admin_id
+              AND u.deleted_at IS NULL
+              AND (
+                    r_legacy.nombre = 'administrador'
+                    OR EXISTS (
+                        SELECT 1
+                        FROM USUARIO_ROL ur
+                        INNER JOIN ROL r2 ON r2.id = ur.rol_id
+                        WHERE ur.usuario_id = u.id
+                          AND ur.activo = 1
+                          AND r2.nombre = 'administrador'
+                    )
+              )
         )
             THROW 50003, 'El usuario no tiene permisos de administrador.', 1;
 
@@ -499,8 +517,22 @@ BEGIN
             THROW 50004, 'Fosil no encontrado o ya eliminado.', 1;
 
         IF NOT EXISTS (
-            SELECT 1 FROM USUARIO u INNER JOIN ROL r ON u.rol_id = r.id
-            WHERE u.id = @admin_id AND r.nombre = 'administrador' AND u.deleted_at IS NULL
+            SELECT 1
+            FROM USUARIO u
+            LEFT JOIN ROL r_legacy ON r_legacy.id = u.rol_id
+            WHERE u.id = @admin_id
+              AND u.deleted_at IS NULL
+              AND (
+                    r_legacy.nombre = 'administrador'
+                    OR EXISTS (
+                        SELECT 1
+                        FROM USUARIO_ROL ur
+                        INNER JOIN ROL r2 ON r2.id = ur.rol_id
+                        WHERE ur.usuario_id = u.id
+                          AND ur.activo = 1
+                          AND r2.nombre = 'administrador'
+                    )
+              )
         )
             THROW 50005, 'El usuario no tiene permisos de administrador.', 1;
 

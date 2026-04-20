@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const multer = require("multer");
+const fs = require("fs");
 
 const auth = require("../../middlewares/auth");
 const checkRole = require("../../middlewares/roles");
@@ -27,16 +28,26 @@ const mediaFilter = (_req, file, cb) => {
   cb(null, true);
 };
 
-/** Imágenes hasta ~12 MB originales; vídeos hasta 100 MB (sin transcodificar). */
+const uploadTmpDir = "uploads/tmp";
+fs.mkdirSync(uploadTmpDir, { recursive: true });
 const uploadMem = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 100 * 1024 * 1024 },
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, uploadTmpDir),
+    filename: (_req, file, cb) =>
+      cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}-${file.originalname}`),
+  }),
+  limits: { fileSize: 25 * 1024 * 1024, files: 10 },
   fileFilter: mediaFilter,
 });
 
 router.get(
   "/publico/fosil/:fosil_id",
   controller.getMultimediaPublico,
+);
+
+router.get(
+  "/publico/catalogo",
+  controller.getCatalogoPublicoImagenes,
 );
 
 router.post(

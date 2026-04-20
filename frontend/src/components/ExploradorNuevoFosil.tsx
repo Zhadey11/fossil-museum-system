@@ -37,7 +37,34 @@ export function ExploradorNuevoFosil({ onCreated, onQueueUpdated }: Props) {
   const [altitud, setAltitud] = useState("");
   const [descripcionUbicacion, setDescripcionUbicacion] = useState("");
   const [fechaHallazgo, setFechaHallazgo] = useState("");
+  const [noAplica, setNoAplica] = useState({
+    latitud: false,
+    longitud: false,
+    altitud: false,
+    descripcion: false,
+    fecha: false,
+  });
   const [geoBusy, setGeoBusy] = useState(false);
+  const nombreTrim = nombre.trim();
+  const nombreShort = nombreTrim.length > 0 && nombreTrim.length < 4;
+  const latMissing = !noAplica.latitud && latitud.trim().length === 0;
+  const lngMissing = !noAplica.longitud && longitud.trim().length === 0;
+  const altMissing = !noAplica.altitud && altitud.trim().length === 0;
+  const descMissing = !noAplica.descripcion && descripcionUbicacion.trim().length === 0;
+  const fechaMissing = !noAplica.fecha && fechaHallazgo.trim().length === 0;
+  const latInvalid = !noAplica.latitud && latitud.trim().length > 0 && parseNum(latitud) == null;
+  const lngInvalid = !noAplica.longitud && longitud.trim().length > 0 && parseNum(longitud) == null;
+  const altInvalid = !noAplica.altitud && altitud.trim().length > 0 && parseNum(altitud) == null;
+  const formLiveInvalid =
+    nombreShort ||
+    latMissing ||
+    lngMissing ||
+    altMissing ||
+    descMissing ||
+    fechaMissing ||
+    latInvalid ||
+    lngInvalid ||
+    altInvalid;
 
   useEffect(() => {
     fetchCatalogosFosilForm()
@@ -103,6 +130,22 @@ export function ExploradorNuevoFosil({ onCreated, onQueueUpdated }: Props) {
     );
   }
 
+  function toggleNoAplicaField(
+    field: "latitud" | "longitud" | "altitud" | "descripcion" | "fecha",
+  ) {
+    setNoAplica((prev) => {
+      const next = !prev[field];
+      if (next) {
+        if (field === "latitud") setLatitud("");
+        if (field === "longitud") setLongitud("");
+        if (field === "altitud") setAltitud("");
+        if (field === "descripcion") setDescripcionUbicacion("");
+        if (field === "fecha") setFechaHallazgo("");
+      }
+      return { ...prev, [field]: next };
+    });
+  }
+
   function getCurrentPositionAsync(
     options: PositionOptions,
   ): Promise<GeolocationPosition> {
@@ -111,21 +154,25 @@ export function ExploradorNuevoFosil({ onCreated, onQueueUpdated }: Props) {
     });
   }
 
-  function geoErrorMessage(err: GeolocationPositionError | Error): string {
+  function geoErrorMessage(
+    err: GeolocationPositionError | Error,
+    extraHint?: string,
+  ): string {
     if ("code" in err && typeof err.code === "number") {
       switch (err.code) {
         case 1:
-          return "Permiso denegado: permití la ubicación para este sitio en la configuración del navegador, o ingresá coordenadas a mano.";
+          return `Permiso denegado: permití la ubicación para este sitio en la configuración del navegador, o ingresá coordenadas a mano.${extraHint ? ` ${extraHint}` : ""}`;
         case 2:
-          return "Ubicación no disponible (GPS apagado o señal débil). Probá al aire libre o usá coordenadas manuales.";
+          return `Ubicación no disponible (GPS apagado o señal débil). Probá al aire libre o usá coordenadas manuales.${extraHint ? ` ${extraHint}` : ""}`;
         case 3:
-          return "Tiempo agotado al pedir ubicación. Probá de nuevo o usá coordenadas manuales.";
+          return `Tiempo agotado al pedir ubicación. Probá de nuevo o usá coordenadas manuales.${extraHint ? ` ${extraHint}` : ""}`;
         default:
           break;
       }
     }
     const m = err instanceof Error ? err.message : "";
-    return m ? `No se pudo obtener GPS: ${m}` : "No se pudo obtener la ubicación.";
+    const base = m ? `No se pudo obtener GPS: ${m}` : "No se pudo obtener la ubicación.";
+    return extraHint ? `${base} ${extraHint}` : base;
   }
 
   async function onUsarGPS() {
@@ -133,15 +180,19 @@ export function ExploradorNuevoFosil({ onCreated, onQueueUpdated }: Props) {
       setFormErr("Tu navegador no soporta geolocalización.");
       return;
     }
-    if (typeof window !== "undefined" && !window.isSecureContext) {
-      setFormErr(
-        "El navegador solo permite GPS en contexto seguro: https o http://localhost. Si abriste el sitio con la IP de tu red (http://192.168…), usá localhost, https o coordenadas manuales.",
-      );
-      return;
-    }
+    const insecureHint =
+      typeof window !== "undefined" && !window.isSecureContext
+        ? "El navegador suele bloquear GPS en contexto no seguro. Abrí el sitio en https o en http://localhost (no por IP de red)."
+        : "";
     setGeoBusy(true);
     setFormErr(null);
     const apply = (pos: GeolocationPosition) => {
+      setNoAplica((prev) => ({
+        ...prev,
+        latitud: false,
+        longitud: false,
+        altitud: false,
+      }));
       setLatitud(pos.coords.latitude.toFixed(7));
       setLongitud(pos.coords.longitude.toFixed(7));
       if (pos.coords.altitude != null && Number.isFinite(pos.coords.altitude)) {
@@ -149,6 +200,21 @@ export function ExploradorNuevoFosil({ onCreated, onQueueUpdated }: Props) {
       }
     };
     try {
+      try {
+        if ("permissions" in navigator && navigator.permissions?.query) {
+          const status = await navigator.permissions.query({
+            name: "geolocation",
+          } as PermissionDescriptor);
+          if (status.state === "denied") {
+            setFormErr(
+              `Tu navegador tiene bloqueado el permiso de ubicación para este sitio.${insecureHint ? ` ${insecureHint}` : ""}`,
+            );
+            return;
+          }
+        }
+      } catch {
+        // En algunos navegadores esta API no está disponible.
+      }
       const pos = await getCurrentPositionAsync({
         enableHighAccuracy: false,
         timeout: 22000,
@@ -169,10 +235,10 @@ export function ExploradorNuevoFosil({ onCreated, onQueueUpdated }: Props) {
           });
           apply(pos);
         } catch (e2) {
-          setFormErr(geoErrorMessage(e2 as GeolocationPositionError));
+          setFormErr(geoErrorMessage(e2 as GeolocationPositionError, insecureHint));
         }
       } else {
-        setFormErr(geoErrorMessage(e1 as GeolocationPositionError));
+        setFormErr(geoErrorMessage(e1 as GeolocationPositionError, insecureHint));
       }
     } finally {
       setGeoBusy(false);
@@ -187,6 +253,18 @@ export function ExploradorNuevoFosil({ onCreated, onQueueUpdated }: Props) {
       setFormErr("Indicá un nombre para el hallazgo.");
       return;
     }
+    if (nombre.trim().length < 4) {
+      setFormErr("El nombre debe tener al menos 4 caracteres.");
+      return;
+    }
+    if (latMissing || lngMissing || altMissing || descMissing || fechaMissing) {
+      setFormErr("Completá todos los campos obligatorios o marcá \"No aplica\" donde corresponda.");
+      return;
+    }
+    if (latInvalid || lngInvalid || altInvalid) {
+      setFormErr("Latitud, longitud y altitud deben ser números válidos o marcarse como \"No aplica\".");
+      return;
+    }
     if (!cantonId || !categoriaId || !eraId || !periodoId) {
       setFormErr("Completá cantón, categoría, era y periodo.");
       return;
@@ -198,11 +276,11 @@ export function ExploradorNuevoFosil({ onCreated, onQueueUpdated }: Props) {
       categoria_id: categoriaId,
       era_id: eraId,
       periodo_id: periodoId,
-      latitud: parseNum(latitud),
-      longitud: parseNum(longitud),
-      altitud_msnm: parseNum(altitud),
-      descripcion_ubicacion: descripcionUbicacion.trim() || undefined,
-      fecha_hallazgo: fechaHallazgo || undefined,
+      latitud: noAplica.latitud ? null : parseNum(latitud),
+      longitud: noAplica.longitud ? null : parseNum(longitud),
+      altitud_msnm: noAplica.altitud ? null : parseNum(altitud),
+      descripcion_ubicacion: noAplica.descripcion ? "No aplica" : descripcionUbicacion.trim(),
+      fecha_hallazgo: noAplica.fecha ? undefined : fechaHallazgo,
     };
     try {
       const res = await postCrearFosil(payload);
@@ -228,6 +306,13 @@ export function ExploradorNuevoFosil({ onCreated, onQueueUpdated }: Props) {
       setAltitud("");
       setDescripcionUbicacion("");
       setFechaHallazgo("");
+      setNoAplica({
+        latitud: false,
+        longitud: false,
+        altitud: false,
+        descripcion: false,
+        fecha: false,
+      });
       onCreated();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Error al guardar";
@@ -275,13 +360,7 @@ export function ExploradorNuevoFosil({ onCreated, onQueueUpdated }: Props) {
         Registrar nuevo hallazgo
       </h2>
       <p className="sec-body" style={{ marginBottom: "1rem", opacity: 0.9 }}>
-        Se guarda en la base como{" "}
-        <code className="catalog-code">pendiente</code>. Un administrador puede
-        aprobarlo después. Si adjuntás una foto, el archivo se almacena en el
-        servidor (carpeta <code className="catalog-code">images/pending</code>) y
-        se registra una fila en la tabla <code className="catalog-code">MULTIMEDIA</code>{" "}
-        vinculada al fósil — no se guarda la imagen dentro de la fila del fósil en
-        SQL, solo la ruta y metadatos.
+        Completá los datos del hallazgo y envialo para revisión administrativa.
       </p>
       <form className="flex flex-col gap-4" onSubmit={onSubmit}>
         {formErr ? (
@@ -324,6 +403,9 @@ export function ExploradorNuevoFosil({ onCreated, onQueueUpdated }: Props) {
             className={inputClass}
             style={inputStyle}
           />
+          {nombreShort ? (
+            <p className="text-xs text-[salmon]">Usá al menos 4 caracteres para identificar el hallazgo.</p>
+          ) : null}
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
@@ -390,43 +472,93 @@ export function ExploradorNuevoFosil({ onCreated, onQueueUpdated }: Props) {
             </button>
           </div>
           <div className="grid gap-4 sm:grid-cols-3">
-            <input
-              placeholder="Latitud"
-              value={latitud}
-              onChange={(e) => setLatitud(e.target.value)}
-              className={inputClass}
-              style={inputStyle}
-            />
-            <input
-              placeholder="Longitud"
-              value={longitud}
-              onChange={(e) => setLongitud(e.target.value)}
-              className={inputClass}
-              style={inputStyle}
-            />
-            <input
-              placeholder="Altitud msnm"
-              value={altitud}
-              onChange={(e) => setAltitud(e.target.value)}
-              className={inputClass}
-              style={inputStyle}
-            />
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs text-[var(--bonedim)]">Latitud</span>
+                <button type="button" className="text-xs underline" onClick={() => toggleNoAplicaField("latitud")}>
+                  {noAplica.latitud ? "Quitar No aplica" : "No aplica"}
+                </button>
+              </div>
+              <input
+                placeholder="Latitud"
+                value={latitud}
+                onChange={(e) => setLatitud(e.target.value)}
+                className={inputClass}
+                style={inputStyle}
+                disabled={noAplica.latitud}
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs text-[var(--bonedim)]">Longitud</span>
+                <button type="button" className="text-xs underline" onClick={() => toggleNoAplicaField("longitud")}>
+                  {noAplica.longitud ? "Quitar No aplica" : "No aplica"}
+                </button>
+              </div>
+              <input
+                placeholder="Longitud"
+                value={longitud}
+                onChange={(e) => setLongitud(e.target.value)}
+                className={inputClass}
+                style={inputStyle}
+                disabled={noAplica.longitud}
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs text-[var(--bonedim)]">Altitud msnm</span>
+                <button type="button" className="text-xs underline" onClick={() => toggleNoAplicaField("altitud")}>
+                  {noAplica.altitud ? "Quitar No aplica" : "No aplica"}
+                </button>
+              </div>
+              <input
+                placeholder="Altitud msnm"
+                value={altitud}
+                onChange={(e) => setAltitud(e.target.value)}
+                className={inputClass}
+                style={inputStyle}
+                disabled={noAplica.altitud}
+              />
+            </div>
           </div>
+          {latInvalid || lngInvalid || altInvalid ? (
+            <p className="text-xs text-[salmon]" style={{ marginTop: "0.5rem" }}>
+              Latitud, longitud y altitud deben ser números válidos o marcarse como "No aplica".
+            </p>
+          ) : null}
           <div className="grid gap-4 sm:grid-cols-2" style={{ marginTop: "0.75rem" }}>
-            <input
-              placeholder="Descripción ubicación (manual)"
-              value={descripcionUbicacion}
-              onChange={(e) => setDescripcionUbicacion(e.target.value)}
-              className={inputClass}
-              style={inputStyle}
-            />
-            <input
-              type="date"
-              value={fechaHallazgo}
-              onChange={(e) => setFechaHallazgo(e.target.value)}
-              className={inputClass}
-              style={inputStyle}
-            />
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs text-[var(--bonedim)]">Descripción ubicación (manual)</span>
+                <button type="button" className="text-xs underline" onClick={() => toggleNoAplicaField("descripcion")}>
+                  {noAplica.descripcion ? "Quitar No aplica" : "No aplica"}
+                </button>
+              </div>
+              <input
+                placeholder="Descripción ubicación (manual)"
+                value={descripcionUbicacion}
+                onChange={(e) => setDescripcionUbicacion(e.target.value)}
+                className={inputClass}
+                style={inputStyle}
+                disabled={noAplica.descripcion}
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs text-[var(--bonedim)]">Fecha de hallazgo</span>
+                <button type="button" className="text-xs underline" onClick={() => toggleNoAplicaField("fecha")}>
+                  {noAplica.fecha ? "Quitar No aplica" : "No aplica"}
+                </button>
+              </div>
+              <input
+                type="date"
+                value={fechaHallazgo}
+                onChange={(e) => setFechaHallazgo(e.target.value)}
+                className={inputClass}
+                style={inputStyle}
+                disabled={noAplica.fecha}
+              />
+            </div>
           </div>
         </div>
 
@@ -514,7 +646,11 @@ export function ExploradorNuevoFosil({ onCreated, onQueueUpdated }: Props) {
           </div>
         </div>
 
-        <button type="submit" className="btn-fill mt-1 w-full sm:w-auto" disabled={saving}>
+        <button
+          type="submit"
+          className="btn-fill mt-1 w-full sm:w-auto"
+          disabled={saving || formLiveInvalid}
+        >
           {saving ? "Guardando…" : "Enviar registro"}
         </button>
       </form>

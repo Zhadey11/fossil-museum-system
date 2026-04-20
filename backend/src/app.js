@@ -1,6 +1,7 @@
 const path = require("path");
 const express = require("express");
 const cors = require("cors");
+const cookieParser = require("cookie-parser");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const swaggerUi = require("swagger-ui-express");
@@ -19,6 +20,7 @@ const estudiosRoutes = require("./modules/estudios/estudios.routes");
 const contactoRoutes = require("./modules/contacto/contacto.routes");
 const catalogosRoutes = require("./modules/catalogos/catalogos.routes");
 const investigacionRoutes = require("./modules/investigacion/investigacion.routes");
+const suscriptoresRoutes = require("./modules/suscriptores/suscriptores.routes");
 
 const app = express();
 const openapiPath = path.join(__dirname, "..", "docs", "openapi.yaml");
@@ -54,14 +56,11 @@ const isProduction = process.env.NODE_ENV === "production";
  * En desarrollo, Next suele mostrar también http://IP-LAN:3000; si FRONTEND_URL solo
  * lista localhost, el login falla por CORS. En producción se usa la lista de .env.
  */
+const configuredOrigins = process.env.FRONTEND_URL
+  ? expandDevOrigins(process.env.FRONTEND_URL.split(",").map((s) => s.trim()))
+  : [];
 const corsOriginOption =
-  !isProduction && process.env.FRONTEND_URL
-    ? true
-    : process.env.FRONTEND_URL
-      ? expandDevOrigins(
-          process.env.FRONTEND_URL.split(",").map((s) => s.trim()),
-        )
-      : true;
+  configuredOrigins.length > 0 ? configuredOrigins : !isProduction;
 
 app.use(
   cors({
@@ -93,11 +92,21 @@ app.use(
   }),
 );
 app.use(express.json());
+app.use(cookieParser());
 app.use(audit);
 
-app.use("/uploads", express.static("uploads"));
-app.use("/images", express.static(path.join(__dirname, "..", "images")));
-app.use("/videos", express.static(path.join(__dirname, "..", "videos")));
+const mediaStaticOptions = {
+  etag: true,
+  lastModified: true,
+  maxAge: "1d",
+  setHeaders: (res) => {
+    res.setHeader("Cache-Control", "public, max-age=86400, stale-while-revalidate=604800");
+  },
+};
+
+app.use("/uploads", express.static("uploads", mediaStaticOptions));
+app.use("/images", express.static(path.join(__dirname, "..", "images"), mediaStaticOptions));
+app.use("/videos", express.static(path.join(__dirname, "..", "videos"), mediaStaticOptions));
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
@@ -115,6 +124,7 @@ app.use("/api/estudios", estudiosRoutes);
 app.use("/api/contacto", contactoRoutes);
 app.use("/api/catalogos", catalogosRoutes);
 app.use("/api/investigacion", investigacionRoutes);
+app.use("/api/suscriptores", suscriptoresRoutes);
 if (openapiDoc) {
   app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(openapiDoc));
 }

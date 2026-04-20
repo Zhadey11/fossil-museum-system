@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { postLogin } from "@/lib/api";
-import { AUTH_TOKEN_KEY, AUTH_USER_KEY } from "@/lib/auth";
+import { AUTH_USER_KEY } from "@/lib/auth";
 import { panelPathForRoles } from "@/lib/roles";
 
 export function LoginForm() {
@@ -13,6 +13,12 @@ export function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const emailTrim = email.trim();
+  const passTrim = password.trim();
+  const emailInvalid =
+    emailTrim.length > 0 && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrim);
+  const passInvalid = passTrim.length > 0 && passTrim.length < 6;
+  const canSubmit = !loading && !emailInvalid && !passInvalid && emailTrim.length > 0 && passTrim.length > 0;
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -23,7 +29,6 @@ export function LoginForm() {
         email: email.trim(),
         password: password.trim(),
       });
-      localStorage.setItem(AUTH_TOKEN_KEY, data.token);
       localStorage.setItem(AUTH_USER_KEY, JSON.stringify(data.user));
       router.refresh();
       router.push(panelPathForRoles(data.user.roles));
@@ -72,6 +77,9 @@ export function LoginForm() {
             borderColor: "var(--border)",
           }}
         />
+        {emailInvalid ? (
+          <p className="text-xs text-[salmon]">Ingresá un correo válido.</p>
+        ) : null}
       </div>
       <div className="flex flex-col gap-2 text-left">
         <label htmlFor="login-pass" className="text-sm text-[var(--bonedim)]">
@@ -138,11 +146,14 @@ export function LoginForm() {
             )}
           </button>
         </div>
+        {passInvalid ? (
+          <p className="text-xs text-[salmon]">La contraseña debe tener al menos 6 caracteres.</p>
+        ) : null}
       </div>
       <button
         type="submit"
         className="btn-fill mt-2 w-full"
-        disabled={loading}
+        disabled={!canSubmit}
       >
         {loading ? "Entrando…" : "Entrar"}
       </button>

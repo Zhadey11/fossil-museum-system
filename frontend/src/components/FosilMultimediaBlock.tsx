@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import {
   deleteMultimedia,
   fetchMultimediaFosil,
@@ -31,6 +32,7 @@ export function FosilMultimediaBlock({ fosilId }: Props) {
   const [descripcion, setDescripcion] = useState("");
   const [uploading, setUploading] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(() => {
@@ -65,7 +67,6 @@ export function FosilMultimediaBlock({ fosilId }: Props) {
   }
 
   async function onDelete(id: number) {
-    if (!window.confirm("¿Eliminar este archivo del registro?")) return;
     setDeletingId(id);
     setErr(null);
     try {
@@ -207,7 +208,7 @@ export function FosilMultimediaBlock({ fosilId }: Props) {
                   className="mt-1 text-salmon underline"
                   style={{ color: "salmon" }}
                   disabled={deletingId === m.id}
-                  onClick={() => onDelete(m.id)}
+                  onClick={() => setConfirmDeleteId(m.id)}
                 >
                   {deletingId === m.id ? "…" : "Eliminar"}
                 </button>
@@ -218,6 +219,19 @@ export function FosilMultimediaBlock({ fosilId }: Props) {
       ) : items && visibles.length === 0 ? (
         <p className="mt-2 text-sm opacity-75">Aún no hay fotos ni videos.</p>
       ) : null}
+      <ConfirmDialog
+        open={confirmDeleteId != null}
+        title="Eliminar archivo"
+        message="¿Eliminar este archivo del registro? Esta acción no se puede deshacer."
+        confirmLabel="Eliminar"
+        busy={deletingId != null}
+        onCancel={() => setConfirmDeleteId(null)}
+        onConfirm={() => {
+          if (confirmDeleteId != null) {
+            onDelete(confirmDeleteId).finally(() => setConfirmDeleteId(null));
+          }
+        }}
+      />
     </div>
   );
 }

@@ -6,7 +6,8 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "perf:lighthouse": "lighthouse http://localhost:3000 --only-categories=performance --chrome-flags=\"--headless\" --output=html --output-path=./lighthouse-report.html"
   },
   "dependencies": {
     "leaflet": "^1.9.4",

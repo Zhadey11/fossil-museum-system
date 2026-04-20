@@ -15,6 +15,7 @@ export default function HistoriaPage() {
       style={{ background: "var(--ink)", color: "var(--bone)" }}
     >
       <header className="historia-hero">
+        <img src="/images/FondoInicial.jpg" alt="Archivo histórico del museo" className="historia-hero-img" />
         <Reveal>
           <span className="sec-eyebrow">Stonewake Museum</span>
           <h1 className="sec-h">
@@ -55,24 +56,16 @@ export default function HistoriaPage() {
         </Reveal>
 
         <Reveal>
-          <h2 className="historia-h2">Orígenes</h2>
-          <p className="sec-body">
-            En 1987 un grupo de naturalistas y docentes fundó el museo con un
-            acervo modesto y una ambición clara: que el público pudiera{" "}
-            <em>ver</em> el tiempo geológico con las manos y los ojos. Desde
-            entonces, la colección ha crecido con donaciones, excavaciones
-            autorizadas e intercambios con instituciones hermanas.
-          </p>
+          <h2 className="historia-h2">Orígenes hasta hoy</h2>
+          <div className="historia-timeline">
+            <div><strong>1987</strong><p>Fundación del museo por naturalistas y docentes.</p></div>
+            <div><strong>1999</strong><p>Primera sala permanente de fósiles mesozoicos.</p></div>
+            <div><strong>2014</strong><p>Inicio del archivo digital y fichas científicas.</p></div>
+            <div><strong>2026</strong><p>Apertura del catálogo público y mapa interactivo.</p></div>
+          </div>
         </Reveal>
-
         <Reveal>
-          <h2 className="historia-h2">Hoy</h2>
-          <p className="sec-body">
-            Conservación climatizada, digitalización de fichas y salas temáticas
-            permiten combinar la experiencia clásica del museo con herramientas
-            actuales. El equipo sigue ampliando el conocimiento sobre
-            biodiversidad antigua y el contexto geológico de cada pieza.
-          </p>
+          <img src="/images/FondoInicial.jpg" alt="Sala de colección fósil" className="historia-inline-img" />
         </Reveal>
 
         <Reveal>
@@ -92,8 +85,8 @@ export default function HistoriaPage() {
             colección.
           </p>
           <div className="historia-cta-btns">
-            <Link href="/#timeline" className="btn-out">
-              Tiempo profundo
+            <Link href="/tiempo-profundo" className="btn-out">
+              Explorar la línea del tiempo →
             </Link>
             <Link href="/catalogo" className="btn-fill">
               Ver colección

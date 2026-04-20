@@ -7,11 +7,11 @@ import { NavAuth } from "@/components/NavAuth";
 
 const links = [
   { href: "/catalogo", label: "Colección" },
+  { href: "/galeria", label: "Galería" },
   { href: "/mapa", label: "Mapa" },
   { href: "/historia", label: "Historia" },
-  { href: "/#timeline", label: "Tiempo profundo" },
-  { href: "/#visit", label: "Visita" },
-  { href: "/contacto", label: "Contacto" },
+  { href: "/tiempo-profundo", label: "Tiempo profundo" },
+  { href: "/visita", label: "Visita" },
 ] as const;
 
 function isNavLinkActive(
@@ -33,6 +33,7 @@ export function TopNav() {
   const [stuck, setStuck] = useState(false);
   const [open, setOpen] = useState(false);
   const [hash, setHash] = useState("");
+  const forceStuck = pathname !== "/";
 
   useEffect(() => {
     const readHash = () => setHash(typeof window !== "undefined" ? window.location.hash : "");
@@ -48,8 +49,27 @@ export function TopNav() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
   return (
-    <nav id="nav" className={stuck ? "stuck" : undefined}>
+    <nav id="nav" className={stuck || forceStuck ? "stuck" : undefined}>
       <Link href="/" className="nav-logo" onClick={() => setOpen(false)}>
         <span className="nav-logo-word">
           <b>Stone</b>Wake
@@ -78,7 +98,7 @@ export function TopNav() {
       <NavAuth />
 
       <Link href="/contacto" className="nav-cta" onClick={() => setOpen(false)}>
-        Información
+        Contáctanos
       </Link>
 
       <button

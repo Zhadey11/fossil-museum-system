@@ -1,4 +1,4 @@
-/** Coincide con dbo.ROL.id en FosilesDB (04_datos_prueba.sql). */
+/** Identificadores de rol usados por el backend. */
 export const ROL = {
   ADMIN: 1,
   INVESTIGADOR: 2,

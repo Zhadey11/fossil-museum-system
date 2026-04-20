@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { AUTH_TOKEN_KEY, getStoredUser } from "@/lib/auth";
+import { getStoredUser } from "@/lib/auth";
 import { hasAnyRole, panelPathForRoles } from "@/lib/roles";
 
 type Props = {
@@ -18,11 +18,9 @@ export function PanelGuard({ need, children }: Props) {
   const needKey = need.join(",");
 
   useEffect(() => {
-    const token =
-      typeof window !== "undefined" ? localStorage.getItem(AUTH_TOKEN_KEY) : null;
     const u = getStoredUser();
 
-    if (!token || !u) {
+    if (!u) {
       router.replace("/login");
       setState("redirect");
       return;

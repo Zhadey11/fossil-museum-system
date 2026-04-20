@@ -1,43 +1,26 @@
 import Link from "next/link";
-import { AboutIllustration } from "@/components/AboutIllustration";
+import Image from "next/image";
 import { DustParticles } from "@/components/DustParticles";
-import { GalleryCard } from "@/components/GalleryCard";
 import { HeroFossilSvg } from "@/components/HeroFossilSvg";
+import { HomeGalleryCarousel, HomeNewsletterForm, HomeStats } from "@/components/HomeSectionsClient";
 import { Reveal } from "@/components/Reveal";
 import { itemsGaleriaInstalaciones } from "@/data/instalacionesGaleria";
-import {
-  TIMELINE_BLOCKS,
-  type TimelineBlock,
-} from "@/data/timeline";
-
-function TimelineCardLink({ block }: { block: TimelineBlock }) {
-  return (
-    <Link
-      href={`/catalogo?periodo=${block.slug}`}
-      className="tl-card"
-      aria-label={`Abrir el catálogo filtrado por periodo ${block.nombrePeriodoDb}`}
-    >
-      <p className="tl-era">{block.etiquetaPeriodo}</p>
-      <h3 className="tl-name">{block.title}</h3>
-      <p className="tl-desc">{block.description}</p>
-      <span className="tl-card-cta">Explorar colección</span>
-    </Link>
-  );
-}
-
-const galleryVariants = [
-  "tall",
-  "default",
-  "default",
-  "wide",
-  "default",
-  "default",
-] as const;
-
-const galleryDelays = [0, 100, 200, 300, 400, 500];
+import { fetchFosilesPublic } from "@/lib/api";
 
 export default async function Home() {
-  const galeriaLugar = itemsGaleriaInstalaciones();
+  const galeriaLugar = itemsGaleriaInstalaciones().slice(0, 6);
+  const api = await fetchFosilesPublic({ page: 1, page_size: 120 });
+  const rows = api.ok ? api.data : [];
+  const years = rows
+    .map((r) => Number(r.periodo_id || r.era_id || 0))
+    .filter((n) => Number.isFinite(n) && n > 0);
+  const oldest = years.length ? Math.max(...years) : 0;
+  const metrics = {
+    specimens: api.total || rows.length,
+    years: oldest > 0 ? oldest * 10 : 0,
+    galleries: new Set(rows.map((r) => r.categoria_codigo).filter(Boolean)).size || 1,
+    countries: new Set(rows.map((r) => String(r.codigo_unico || "").slice(0, 3)).filter(Boolean)).size || 1,
+  };
 
   return (
     <>
@@ -79,37 +62,10 @@ export default async function Home() {
           </div>
         </div>
 
-        <div className="scroll-cue" aria-hidden>
-          <span>Scroll</span>
-          <svg width="16" height="24" viewBox="0 0 16 24" fill="none">
-            <path
-              d="M8 0v20M1 13l7 8 7-8"
-              stroke="rgba(200,130,10,.7)"
-              strokeWidth="1.5"
-            />
-          </svg>
-        </div>
       </section>
 
       <Reveal className="feat-band" delayMs={0}>
-        <div className="feat-band-inner">
-          <div className="feat-stat">
-            <span className="feat-num">12.400+</span>
-            <span className="feat-lbl">Especímenes</span>
-          </div>
-          <div className="feat-stat">
-            <span className="feat-num">540M</span>
-            <span className="feat-lbl">Años representados</span>
-          </div>
-          <div className="feat-stat">
-            <span className="feat-num">6</span>
-            <span className="feat-lbl">Galerías</span>
-          </div>
-          <div className="feat-stat">
-            <span className="feat-num">38</span>
-            <span className="feat-lbl">Países de origen</span>
-          </div>
-        </div>
+        <HomeStats metrics={metrics} />
       </Reveal>
 
       <section id="gallery">
@@ -121,45 +77,32 @@ export default async function Home() {
             </h2>
             <div className="sec-rule" />
             <p className="sec-body">
-              Recorrido visual por salas y ambientes del museo: son fotos del lugar, no piezas del
-              catálogo fósil. Para cambiar las imágenes, usá la carpeta de instalaciones en el
-              servidor de medios del sistema.
+              Recorrido visual por salas y ambientes del museo. Esta sección presenta
+              espacios de exhibición y áreas institucionales para acompañar la visita.
             </p>
           </Reveal>
         </div>
 
-        <div className="gallery-grid">
-          {galeriaLugar.map((espacio, i) => (
-            <GalleryCard
-              key={espacio.id}
-              name={espacio.titulo}
-              category={espacio.subtitulo}
-              imageSrc={espacio.imageSrc}
-              description={espacio.descripcion}
-              variant={galleryVariants[i] ?? "default"}
-              delayMs={galleryDelays[i] ?? 0}
-              fichaHref={espacio.href}
-              linkLabel="Conocer espacio"
-            />
-          ))}
-        </div>
+        <HomeGalleryCarousel items={galeriaLugar} />
       </section>
 
       <section id="about">
         <Reveal variant="reveal-l" className="about-vis">
-          <div className="about-frame">
+            <div className="about-frame">
             <div className="about-glow" />
-            <div className="about-svg-wrap">
-              <AboutIllustration />
+              <div className="about-svg-wrap" style={{ overflow: "hidden" }}>
+                <Image
+                  src="/images/FondoInicial.jpg"
+                  alt="Fósil en exhibición"
+                  width={1200}
+                  height={800}
+                  sizes="(max-width: 1024px) 100vw, 50vw"
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                />
             </div>
-            <div className="about-corner tl" />
-            <div className="about-corner tr" />
-            <div className="about-corner bl" />
-            <div className="about-corner br" />
             <span className="about-label">Detalle de espécimen — Galería I</span>
             <span className="about-year">Est. 1987</span>
           </div>
-          <div className="about-accent" aria-hidden />
         </Reveal>
 
         <Reveal variant="reveal-r">
@@ -184,57 +127,8 @@ export default async function Home() {
         </Reveal>
       </section>
 
-      <section id="timeline">
-        <div className="tl-header">
-          <Reveal>
-            <span className="sec-eyebrow">Registro geológico</span>
-            <h2 className="sec-h">
-              Un viaje por el <em>tiempo profundo</em>
-            </h2>
-            <div className="sec-rule" />
-            <p className="sec-body" style={{ margin: "0 auto" }}>
-              De la primera vida compleja a la última gran extinción: hitos del
-              planeta en un solo recorrido. Pulsa un hito para abrir el catálogo
-              filtrado por periodo geológico (demo, alineado a PERIODO_GEOLOGICO).
-            </p>
-          </Reveal>
-        </div>
-
-        <div className="tl-wrap">
-          <div className="tl-line" aria-hidden />
-
-          {TIMELINE_BLOCKS.map((block) => (
-            <Reveal key={block.slug} className="tl-item">
-              {block.cardSide === "left" ? (
-                <>
-                  <div className="tl-left">
-                    <TimelineCardLink block={block} />
-                  </div>
-                  <div className="tl-mid">
-                    <div className="tl-dot" />
-                    <span className="tl-mya">{block.mya}</span>
-                  </div>
-                  <div className="tl-right" />
-                </>
-              ) : (
-                <>
-                  <div className="tl-left" />
-                  <div className="tl-mid">
-                    <div className="tl-dot" />
-                    <span className="tl-mya">{block.mya}</span>
-                  </div>
-                  <div className="tl-right">
-                    <TimelineCardLink block={block} />
-                  </div>
-                </>
-              )}
-            </Reveal>
-          ))}
-        </div>
-      </section>
-
       <section id="visit">
-        <Reveal variant="reveal-l">
+        <Reveal>
           <span className="sec-eyebrow">Planifica tu visita</span>
           <h2 className="sec-h">
             Ven a <em>explorar</em>
@@ -244,62 +138,13 @@ export default async function Home() {
           <div className="sec-rule" />
           <p className="sec-body">
             Abierto todo el año: visitas guiadas, talleres y programas
-            educativos (solo referencia visual).
+            educativos para todas las edades.
           </p>
-          <div className="visit-cards">
-            <div className="vcard">
-              <span className="vcard-icon">🕙</span>
-              <p className="vcard-label">Horario</p>
-              <p className="vcard-val">
-                Mar – Dom
-                <br />
-                9:00 – 18:00
-              </p>
-            </div>
-            <div className="vcard">
-              <span className="vcard-icon">🎟</span>
-              <p className="vcard-label">Entradas</p>
-              <p className="vcard-val">
-                Adultos 18 €
-                <br />
-                Estudiantes 10 €
-                <br />
-                Menores de 5: gratis
-              </p>
-            </div>
-            <div className="vcard">
-              <span className="vcard-icon">📍</span>
-              <p className="vcard-label">Ubicación</p>
-              <p className="vcard-val">
-                1 Stonewake Drive
-                <br />
-                Parque del Patrimonio Natural
-              </p>
-            </div>
-            <div className="vcard">
-              <span className="vcard-icon">📞</span>
-              <p className="vcard-label">Contacto</p>
-              <p className="vcard-val">
-                info@stonewake.org
-                <br />
-                (555) 012-3456
-              </p>
-            </div>
+          <div className="about-readmore">
+            <Link href="/visita" className="btn-fill">
+              Leer más
+            </Link>
           </div>
-        </Reveal>
-
-        <Reveal variant="reveal-r" className="map-box">
-          <div className="map-grid" aria-hidden />
-          <div className="map-glow" aria-hidden />
-          <div className="map-pin" aria-hidden>
-            📍
-          </div>
-          <p className="map-addr">
-            1 Stonewake Drive
-            <br />
-            Parque del Patrimonio Natural
-          </p>
-          <span className="map-badge">Abierto mar – dom</span>
         </Reveal>
       </section>
 
@@ -315,19 +160,10 @@ export default async function Home() {
             </h2>
             <div className="sec-rule" style={{ margin: "1.4rem auto" }} />
             <p className="sec-body" style={{ margin: "0 auto" }}>
-              Novedades sobre exhibiciones y eventos (formulario solo visual).
+              Recibí novedades sobre exhibiciones, colecciones y actividades
+              académicas del museo.
             </p>
-            <form className="nl-form" aria-label="Newsletter (no funcional)">
-              <input
-                type="email"
-                placeholder="Tu correo electrónico"
-                disabled
-                readOnly
-              />
-              <button type="button" disabled>
-                Suscribirse
-              </button>
-            </form>
+            <HomeNewsletterForm />
           </Reveal>
         </div>
       </section>
