@@ -1,6 +1,9 @@
 @import "tailwindcss";
 
-/* ── TOKENS (Stonewake v2 — Cormorant / Jost) ── */
+/* ── TOKENS (Stonewake v2) ──
+   Tipografías: se cargan en app/layout.tsx con next/font/google.
+   Variables en <body>: --font-ui (Source Sans 3), --font-cormorant, --font-cormorant-garamond.
+   Para cambiar familia/pesos: edita layout.tsx; para tamaños y pesos en bloques: este archivo. */
 :root {
   --ink: #080705;
   --surface: #0f0d0a;
@@ -46,6 +49,7 @@ html {
 }
 
 body {
+  /* UI / cuerpo: Source Sans 3 → var(--font-ui) */
   font-family: var(--font-ui), ui-sans-serif, system-ui, sans-serif;
   background: var(--ink);
   color: var(--bone);
@@ -229,6 +233,87 @@ body.sw-cursor-on:has(button:hover) #sw-cur2 {
   background: var(--amberhot);
   transform: translateY(-2px);
   box-shadow: 0 6px 24px rgba(200, 130, 10, 0.3);
+}
+
+.nav-cta-ghost {
+  background: transparent;
+  color: var(--bone);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  font: inherit;
+}
+
+.nav-cta-ghost:hover {
+  background: var(--surface);
+  transform: none;
+  box-shadow: none;
+}
+
+.nav-auth-cluster {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.panel-subnav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem 1rem;
+  padding: 1rem clamp(1rem, 4vw, 2.5rem);
+  border-bottom: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.panel-subnav-roles {
+  width: 100%;
+  margin: 0 0 0.15rem;
+  font-size: 0.75rem;
+  color: var(--bonedim);
+  opacity: 0.9;
+  letter-spacing: 0.02em;
+}
+
+.panel-subnav-link {
+  font-family: var(--font-ui), sans-serif;
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--bonedim);
+  text-decoration: none;
+  padding: 0.35rem 0;
+}
+
+.panel-subnav-link:hover {
+  color: var(--amber);
+}
+
+.panel-subnav-link.active {
+  color: var(--amberhot);
+}
+
+.panel-inner {
+  padding: 2rem clamp(1rem, 4vw, 3rem) 4rem;
+  max-width: 56rem;
+  margin: 0 auto;
+}
+
+.panel-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.panel-table th,
+.panel-table td {
+  border: 1px solid var(--border);
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+}
+
+.panel-table thead {
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .nav-burger {
@@ -1839,4 +1924,188 @@ a.tl-card:hover .tl-card-cta {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--amber);
+}
+
+/* ── MAPA DE HALLAZGOS (Leaflet) ── */
+.mapa-fosiles {
+  margin-top: 1rem;
+}
+
+.mapa-fosiles-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1rem 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.mapa-fosiles-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-family: var(--font-ui), sans-serif;
+  font-size: 0.65rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--bonedim);
+}
+
+.mapa-fosiles-select {
+  min-width: 12rem;
+  padding: 0.55rem 0.75rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--bone);
+  font-family: var(--font-ui), sans-serif;
+  font-size: 0.85rem;
+  font-weight: 400;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.mapa-fosiles-select:disabled {
+  opacity: 0.45;
+}
+
+.mapa-fosiles-count {
+  font-family: var(--font-ui), sans-serif;
+  font-size: 0.78rem;
+  color: var(--amberhot);
+  margin-left: auto;
+}
+
+.mapa-fosiles-canvas {
+  width: 100%;
+  height: min(70vh, 520px);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  background: var(--card);
+  position: relative;
+}
+
+.mapa-fosiles-canvas::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      ellipse 70% 55% at 50% 45%,
+      rgba(240, 192, 96, 0.08) 0%,
+      transparent 75%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(200, 130, 10, 0.16) 0%,
+      rgba(120, 75, 15, 0.1) 100%
+    );
+  mix-blend-mode: multiply;
+}
+
+.mapa-fosiles-canvas .leaflet-tile-pane {
+  filter: sepia(0.95) hue-rotate(-12deg) saturate(0.85) brightness(0.78)
+    contrast(1.12);
+}
+
+.map-pin-white {
+  background: transparent;
+  border: none;
+}
+
+.map-pin-white::before {
+  content: "";
+  display: block;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid rgba(200, 130, 10, 0.65);
+  box-shadow:
+    0 0 0 2px rgba(8, 7, 5, 0.35),
+    0 6px 16px rgba(0, 0, 0, 0.35);
+}
+
+.mapa-fosiles-note,
+.mapa-fosiles-3d {
+  font-family: var(--font-ui), sans-serif;
+  font-size: 0.82rem;
+  color: var(--bonedim);
+  line-height: 1.55;
+  margin-top: 1rem;
+  max-width: 48rem;
+}
+
+.mapa-fosiles-3d {
+  margin-top: 0.75rem;
+}
+
+.mapa-fosiles-back {
+  margin-top: 2rem;
+  text-align: center;
+}
+
+.mapa-fosiles-loading {
+  font-family: var(--font-ui), sans-serif;
+  font-size: 0.9rem;
+  color: var(--bonedim);
+  padding: 3rem;
+  text-align: center;
+}
+
+.leaflet-container {
+  font-family: var(--font-ui), sans-serif;
+}
+
+/* Popup Leaflet: fondo claro por defecto → textos oscuros (no usar --white en títulos). */
+.leaflet-popup-content-wrapper {
+  border-radius: var(--radius-sm);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.leaflet-popup-content {
+  margin: 12px 14px 12px;
+  min-width: 200px;
+}
+
+.leaflet-popup-content .map-popup-inner strong {
+  display: block;
+  color: #141210;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: 0.01em;
+}
+
+.leaflet-popup-content .map-popup-inner p {
+  color: #3a342c;
+  font-size: 0.875rem;
+  margin: 0.5rem 0 0.75rem;
+  line-height: 1.5;
+}
+
+.leaflet-popup-content a.map-popup-link {
+  color: #9a5c06;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(200, 130, 10, 0.45);
+  padding-bottom: 1px;
+}
+
+.leaflet-popup-content a.map-popup-link:hover {
+  color: #6b3d00;
+  border-color: rgba(200, 130, 10, 0.7);
+}
+
+.fosil-ficha-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 2.5rem;
 }

@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { NavAuth } from "@/components/NavAuth";
 
 const links = [
   { href: "/catalogo", label: "Colección" },
+  { href: "/mapa", label: "Mapa" },
   { href: "/historia", label: "Historia" },
   { href: "/#timeline", label: "Tiempo profundo" },
   { href: "/#visit", label: "Visita" },
-  { href: "/login", label: "Login" },
   { href: "/contacto", label: "Contacto" },
 ] as const;
 
@@ -73,6 +74,8 @@ export function TopNav() {
           );
         })}
       </ul>
+
+      <NavAuth />
 
       <Link href="/contacto" className="nav-cta" onClick={() => setOpen(false)}>
         Información
