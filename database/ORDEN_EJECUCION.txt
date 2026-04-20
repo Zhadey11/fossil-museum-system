@@ -1,0 +1,34 @@
+FosilesDB — orden recomendado de scripts (SQL Server Management Studio o sqlcmd)
+
+1. 01_base_datos.sql       — crea la base FosilesDB y tablas base (ROL, ubicacion, ERA, PERIODO_GEOLOGICO, etc.)
+2. 02_tablas_principales.sql — FOSIL, MULTIMEDIA, USUARIO, USUARIO_ROL, CONTACTO, triggers, etc.
+3. 03_indices_vistas_sp.sql — indices, vistas, procedimientos almacenados
+4. 04_datos_prueba.sql      — datos de prueba (usuarios, fósiles, roles, MULTIMEDIA con /images/fossiles/…)
+5. 06_solicitud_investigacion.sql — solicitudes de acceso investigador / autorizaciones por fósil
+6. 07_multimedia_archivos_locales.sql — opcional: solo si cargaste un 04 antiguo sin multimedia; hoy el contenido está en el 04
+7. 00_fulltext_setup.sql   — opcional, solo si usáis búsqueda de texto completo
+
+Tras el paso 4, copiad las carpetas de fotos del repo bajo backend/images/fossiles/ (generales, mineralizados, rocas, paleontologico-especifico) para que el API estático /images sirva los archivos.
+
+Conexión backend (.env):
+  DB_DATABASE=FosilesDB
+  (mismo nombre que CREATE DATABASE en 01_base_datos.sql)
+
+Inicio de sesión web (tras ejecutar 04_datos_prueba.sql):
+  El hash en @h corresponde a la contraseña de demostración: Admin123!
+  Ejemplos de correo en USUARIO:
+    admin@fosilesdb.net     (rol administrador)
+    ajimenez@gmail.com      (explorador en datos de prueba)
+
+Si la base ya existía con un hash antiguo, volved a ejecutar 04_datos_prueba en una BD limpia o:
+  UPDATE USUARIO SET password_hash = '<hash de 04_datos_prueba.sql>' WHERE deleted_at IS NULL;
+
+Frontend:
+  NEXT_PUBLIC_API_URL=http://localhost:4000
+Backend:
+  FRONTEND_URL=http://localhost:3000
+  JWT_SECRET=<cadena larga y secreta>
+
+Arranque conjunto (raíz del repo, tras npm install):
+  npm run dev:all
+  Levanta API (puerto 4000) y Next.js (puerto 3000).
