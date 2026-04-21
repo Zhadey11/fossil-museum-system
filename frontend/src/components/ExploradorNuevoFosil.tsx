@@ -44,6 +44,7 @@ export function ExploradorNuevoFosil({ onCreated, onQueueUpdated }: Props) {
     descripcion: false,
     fecha: false,
   });
+  const [submitTried, setSubmitTried] = useState(false);
   const [geoBusy, setGeoBusy] = useState(false);
   const nombreTrim = nombre.trim();
   const nombreShort = nombreTrim.length > 0 && nombreTrim.length < 4;
@@ -52,6 +53,10 @@ export function ExploradorNuevoFosil({ onCreated, onQueueUpdated }: Props) {
   const altMissing = !noAplica.altitud && altitud.trim().length === 0;
   const descMissing = !noAplica.descripcion && descripcionUbicacion.trim().length === 0;
   const fechaMissing = !noAplica.fecha && fechaHallazgo.trim().length === 0;
+  const fechaInvalid =
+    !noAplica.fecha &&
+    fechaHallazgo.trim().length > 0 &&
+    toIsoDateFromDigits(fechaHallazgo) == null;
   const latInvalid = !noAplica.latitud && latitud.trim().length > 0 && parseNum(latitud) == null;
   const lngInvalid = !noAplica.longitud && longitud.trim().length > 0 && parseNum(longitud) == null;
   const altInvalid = !noAplica.altitud && altitud.trim().length > 0 && parseNum(altitud) == null;
@@ -62,9 +67,26 @@ export function ExploradorNuevoFosil({ onCreated, onQueueUpdated }: Props) {
     altMissing ||
     descMissing ||
     fechaMissing ||
+    fechaInvalid ||
     latInvalid ||
     lngInvalid ||
     altInvalid;
+  const nombreMissing = nombreTrim.length === 0;
+  const cantonMissing = !cantonId;
+  const categoriaMissing = !categoriaId;
+  const eraMissing = !eraId;
+  const periodoMissing = !periodoId;
+  const hasMissingRequired =
+    nombreMissing ||
+    cantonMissing ||
+    categoriaMissing ||
+    eraMissing ||
+    periodoMissing ||
+    latMissing ||
+    lngMissing ||
+    altMissing ||
+    descMissing ||
+    fechaMissing;
 
   useEffect(() => {
     fetchCatalogosFosilForm()
@@ -109,6 +131,18 @@ export function ExploradorNuevoFosil({ onCreated, onQueueUpdated }: Props) {
     if (!v) return null;
     const n = Number(v);
     return Number.isFinite(n) ? n : null;
+  }
+
+  function toIsoDateFromDigits(value: string): string | null {
+    const digits = value.replace(/\D/g, "");
+    if (digits.length !== 8) return null;
+    const y = Number(digits.slice(0, 4));
+    const m = Number(digits.slice(4, 6));
+    const d = Number(digits.slice(6, 8));
+    if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return null;
+    if (m < 1 || m > 12) return null;
+    if (d < 1 || d > 31) return null;
+    return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6, 8)}`;
   }
 
   function queueOffline(payload: {
@@ -247,6 +281,7 @@ export function ExploradorNuevoFosil({ onCreated, onQueueUpdated }: Props) {
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
+    setSubmitTried(true);
     setFormErr(null);
     setOkMsg(null);
     if (!nombre.trim()) {
@@ -258,15 +293,27 @@ export function ExploradorNuevoFosil({ onCreated, onQueueUpdated }: Props) {
       return;
     }
     if (latMissing || lngMissing || altMissing || descMissing || fechaMissing) {
-      setFormErr("Completá todos los campos obligatorios o marcá \"No aplica\" donde corresponda.");
+      const msg = "Por favor completá los datos faltantes o marcá \"No aplica\" donde corresponda.";
+      setFormErr(msg);
+      if (typeof window !== "undefined") window.alert(msg);
       return;
     }
     if (latInvalid || lngInvalid || altInvalid) {
-      setFormErr("Latitud, longitud y altitud deben ser números válidos o marcarse como \"No aplica\".");
+      const msg = "Latitud, longitud y altitud deben ser números válidos o marcarse como \"No aplica\".";
+      setFormErr(msg);
+      if (typeof window !== "undefined") window.alert(msg);
+      return;
+    }
+    if (fechaInvalid) {
+      const msg = "La fecha de hallazgo debe tener 8 números en formato AAAAMMDD.";
+      setFormErr(msg);
+      if (typeof window !== "undefined") window.alert(msg);
       return;
     }
     if (!cantonId || !categoriaId || !eraId || !periodoId) {
-      setFormErr("Completá cantón, categoría, era y periodo.");
+      const msg = "Por favor completá los datos faltantes.";
+      setFormErr(msg);
+      if (typeof window !== "undefined") window.alert(msg);
       return;
     }
     setSaving(true);
@@ -280,7 +327,7 @@ export function ExploradorNuevoFosil({ onCreated, onQueueUpdated }: Props) {
       longitud: noAplica.longitud ? null : parseNum(longitud),
       altitud_msnm: noAplica.altitud ? null : parseNum(altitud),
       descripcion_ubicacion: noAplica.descripcion ? "No aplica" : descripcionUbicacion.trim(),
-      fecha_hallazgo: noAplica.fecha ? undefined : fechaHallazgo,
+      fecha_hallazgo: noAplica.fecha ? undefined : toIsoDateFromDigits(fechaHallazgo) || undefined,
     };
     try {
       const res = await postCrearFosil(payload);
@@ -313,6 +360,7 @@ export function ExploradorNuevoFosil({ onCreated, onQueueUpdated }: Props) {
         descripcion: false,
         fecha: false,
       });
+      setSubmitTried(false);
       onCreated();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Error al guardar";
@@ -392,6 +440,7 @@ export function ExploradorNuevoFosil({ onCreated, onQueueUpdated }: Props) {
         <div className="flex flex-col gap-2 text-left">
           <label htmlFor="nf-nombre" className="text-sm text-[var(--bonedim)]">
             Nombre del hallazgo
+            {submitTried && nombreMissing ? <span style={{ color: "salmon" }}> *</span> : null}
           </label>
           <input
             id="nf-nombre"
@@ -401,7 +450,7 @@ export function ExploradorNuevoFosil({ onCreated, onQueueUpdated }: Props) {
             onChange={(e) => setNombre(e.target.value)}
             placeholder="Ej. Molusco en caliza"
             className={inputClass}
-            style={inputStyle}
+            style={submitTried && (nombreMissing || nombreShort) ? { ...inputStyle, borderColor: "salmon" } : inputStyle}
           />
           {nombreShort ? (
             <p className="text-xs text-[salmon]">Usá al menos 4 caracteres para identificar el hallazgo.</p>
@@ -412,11 +461,12 @@ export function ExploradorNuevoFosil({ onCreated, onQueueUpdated }: Props) {
           <div className="flex flex-col gap-2 text-left">
             <label htmlFor="nf-canton" className="text-sm text-[var(--bonedim)]">
               Cantón
+              {submitTried && cantonMissing ? <span style={{ color: "salmon" }}> *</span> : null}
             </label>
             <select
               id="nf-canton"
               className={inputClass}
-              style={inputStyle}
+              style={submitTried && cantonMissing ? { ...inputStyle, borderColor: "salmon" } : inputStyle}
               value={cantonId}
               onChange={(e) => setCantonId(Number(e.target.value))}
             >
@@ -433,11 +483,12 @@ export function ExploradorNuevoFosil({ onCreated, onQueueUpdated }: Props) {
               className="text-sm text-[var(--bonedim)]"
             >
               Categoría
+              {submitTried && categoriaMissing ? <span style={{ color: "salmon" }}> *</span> : null}
             </label>
             <select
               id="nf-categoria"
               className={inputClass}
-              style={inputStyle}
+              style={submitTried && categoriaMissing ? { ...inputStyle, borderColor: "salmon" } : inputStyle}
               value={categoriaId}
               onChange={(e) => setCategoriaId(Number(e.target.value))}
             >
@@ -475,6 +526,7 @@ export function ExploradorNuevoFosil({ onCreated, onQueueUpdated }: Props) {
             <div className="flex flex-col gap-1">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs text-[var(--bonedim)]">Latitud</span>
+                {submitTried && latMissing ? <span style={{ color: "salmon" }}> *</span> : null}
                 <button type="button" className="text-xs underline" onClick={() => toggleNoAplicaField("latitud")}>
                   {noAplica.latitud ? "Quitar No aplica" : "No aplica"}
                 </button>
@@ -484,13 +536,14 @@ export function ExploradorNuevoFosil({ onCreated, onQueueUpdated }: Props) {
                 value={latitud}
                 onChange={(e) => setLatitud(e.target.value)}
                 className={inputClass}
-                style={inputStyle}
+                style={submitTried && (latMissing || latInvalid) ? { ...inputStyle, borderColor: "salmon" } : inputStyle}
                 disabled={noAplica.latitud}
               />
             </div>
             <div className="flex flex-col gap-1">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs text-[var(--bonedim)]">Longitud</span>
+                {submitTried && lngMissing ? <span style={{ color: "salmon" }}> *</span> : null}
                 <button type="button" className="text-xs underline" onClick={() => toggleNoAplicaField("longitud")}>
                   {noAplica.longitud ? "Quitar No aplica" : "No aplica"}
                 </button>
@@ -500,13 +553,14 @@ export function ExploradorNuevoFosil({ onCreated, onQueueUpdated }: Props) {
                 value={longitud}
                 onChange={(e) => setLongitud(e.target.value)}
                 className={inputClass}
-                style={inputStyle}
+                style={submitTried && (lngMissing || lngInvalid) ? { ...inputStyle, borderColor: "salmon" } : inputStyle}
                 disabled={noAplica.longitud}
               />
             </div>
             <div className="flex flex-col gap-1">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs text-[var(--bonedim)]">Altitud msnm</span>
+                {submitTried && altMissing ? <span style={{ color: "salmon" }}> *</span> : null}
                 <button type="button" className="text-xs underline" onClick={() => toggleNoAplicaField("altitud")}>
                   {noAplica.altitud ? "Quitar No aplica" : "No aplica"}
                 </button>
@@ -516,20 +570,21 @@ export function ExploradorNuevoFosil({ onCreated, onQueueUpdated }: Props) {
                 value={altitud}
                 onChange={(e) => setAltitud(e.target.value)}
                 className={inputClass}
-                style={inputStyle}
+                style={submitTried && (altMissing || altInvalid) ? { ...inputStyle, borderColor: "salmon" } : inputStyle}
                 disabled={noAplica.altitud}
               />
             </div>
           </div>
           {latInvalid || lngInvalid || altInvalid ? (
             <p className="text-xs text-[salmon]" style={{ marginTop: "0.5rem" }}>
-              Latitud, longitud y altitud deben ser números válidos o marcarse como "No aplica".
+              Latitud, longitud y altitud deben ser números válidos o marcarse como &quot;No aplica&quot;.
             </p>
           ) : null}
           <div className="grid gap-4 sm:grid-cols-2" style={{ marginTop: "0.75rem" }}>
             <div className="flex flex-col gap-1">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs text-[var(--bonedim)]">Descripción ubicación (manual)</span>
+                {submitTried && descMissing ? <span style={{ color: "salmon" }}> *</span> : null}
                 <button type="button" className="text-xs underline" onClick={() => toggleNoAplicaField("descripcion")}>
                   {noAplica.descripcion ? "Quitar No aplica" : "No aplica"}
                 </button>
@@ -539,23 +594,27 @@ export function ExploradorNuevoFosil({ onCreated, onQueueUpdated }: Props) {
                 value={descripcionUbicacion}
                 onChange={(e) => setDescripcionUbicacion(e.target.value)}
                 className={inputClass}
-                style={inputStyle}
+                style={submitTried && descMissing ? { ...inputStyle, borderColor: "salmon" } : inputStyle}
                 disabled={noAplica.descripcion}
               />
             </div>
             <div className="flex flex-col gap-1">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-xs text-[var(--bonedim)]">Fecha de hallazgo</span>
+                <span className="text-xs text-[var(--bonedim)]">Fecha de hallazgo (AAAAMMDD)</span>
+                {submitTried && fechaMissing ? <span style={{ color: "salmon" }}> *</span> : null}
                 <button type="button" className="text-xs underline" onClick={() => toggleNoAplicaField("fecha")}>
                   {noAplica.fecha ? "Quitar No aplica" : "No aplica"}
                 </button>
               </div>
               <input
-                type="date"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 value={fechaHallazgo}
-                onChange={(e) => setFechaHallazgo(e.target.value)}
+                onChange={(e) => setFechaHallazgo(e.target.value.replace(/\D/g, "").slice(0, 8))}
+                placeholder="AAAAMMDD"
                 className={inputClass}
-                style={inputStyle}
+                style={submitTried && (fechaMissing || fechaInvalid) ? { ...inputStyle, borderColor: "salmon" } : inputStyle}
                 disabled={noAplica.fecha}
               />
             </div>
@@ -604,11 +663,12 @@ export function ExploradorNuevoFosil({ onCreated, onQueueUpdated }: Props) {
           <div className="flex flex-col gap-2 text-left">
             <label htmlFor="nf-era" className="text-sm text-[var(--bonedim)]">
               Era geológica
+              {submitTried && eraMissing ? <span style={{ color: "salmon" }}> *</span> : null}
             </label>
             <select
               id="nf-era"
               className={inputClass}
-              style={inputStyle}
+              style={submitTried && eraMissing ? { ...inputStyle, borderColor: "salmon" } : inputStyle}
               value={eraId}
               onChange={(e) => onEraChange(Number(e.target.value))}
             >
@@ -625,11 +685,12 @@ export function ExploradorNuevoFosil({ onCreated, onQueueUpdated }: Props) {
               className="text-sm text-[var(--bonedim)]"
             >
               Periodo (debe corresponder a la era)
+              {submitTried && periodoMissing ? <span style={{ color: "salmon" }}> *</span> : null}
             </label>
             <select
               id="nf-periodo"
               className={inputClass}
-              style={inputStyle}
+              style={submitTried && periodoMissing ? { ...inputStyle, borderColor: "salmon" } : inputStyle}
               value={periodoId}
               onChange={(e) => setPeriodoId(Number(e.target.value))}
             >
@@ -649,10 +710,15 @@ export function ExploradorNuevoFosil({ onCreated, onQueueUpdated }: Props) {
         <button
           type="submit"
           className="btn-fill mt-1 w-full sm:w-auto"
-          disabled={saving || formLiveInvalid}
+          disabled={saving}
         >
           {saving ? "Guardando…" : "Enviar registro"}
         </button>
+        {submitTried && hasMissingRequired ? (
+          <p className="text-xs" style={{ color: "salmon" }}>
+            * Campos obligatorios faltantes
+          </p>
+        ) : null}
       </form>
     </section>
   );

@@ -7,7 +7,13 @@
     "start": "node server.js",
     "dev": "nodemon server.js",
     "sync:images": "node scripts/sync-fossil-images-to-db.js",
-    "check:media": "node scripts/check-multimedia-files.js"
+    "check:media": "node scripts/check-multimedia-files.js",
+    "audit:media-consistency": "node scripts/audit-fossil-media-consistency.js",
+    "fix:media-filename-dups": "node scripts/fix-media-filename-duplicates.js --dry-run",
+    "fix:media-filename-dups:apply": "node scripts/fix-media-filename-duplicates.js --apply",
+    "apply:media-rules": "node scripts/apply-multimedia-url-rules.js",
+    "apply:media-rules:dry": "node scripts/apply-multimedia-url-rules.js --dry-run",
+    "verify:fossil-media": "node scripts/apply-multimedia-url-rules.js --verify-only"
   },
   "keywords": [],
   "author": "",

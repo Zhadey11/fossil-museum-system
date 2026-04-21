@@ -1,4 +1,5 @@
 const path = require("path");
+const { IMAGES_DIR, VIDEOS_DIR, UPLOADS_DIR } = require("./config/paths");
 const express = require("express");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
@@ -99,14 +100,17 @@ const mediaStaticOptions = {
   etag: true,
   lastModified: true,
   maxAge: "1d",
-  setHeaders: (res) => {
+  setHeaders: (res, filePath) => {
     res.setHeader("Cache-Control", "public, max-age=86400, stale-while-revalidate=604800");
+    if (typeof filePath === "string" && filePath.toLowerCase().endsWith(".avif")) {
+      res.setHeader("Content-Type", "image/avif");
+    }
   },
 };
 
-app.use("/uploads", express.static("uploads", mediaStaticOptions));
-app.use("/images", express.static(path.join(__dirname, "..", "images"), mediaStaticOptions));
-app.use("/videos", express.static(path.join(__dirname, "..", "videos"), mediaStaticOptions));
+app.use("/uploads", express.static(UPLOADS_DIR, mediaStaticOptions));
+app.use("/images", express.static(IMAGES_DIR, mediaStaticOptions));
+app.use("/videos", express.static(VIDEOS_DIR, mediaStaticOptions));
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });

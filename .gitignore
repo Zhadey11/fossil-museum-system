@@ -1,0 +1,9 @@
+# Raíz del monorepo (frontend/backend tienen el suyo propio)
+node_modules/
+.DS_Store
+Thumbs.db
+*.log
+npm-debug.log*
+
+# Caché de build Next (también ignorado en frontend/.gitignore)
+frontend/.next/

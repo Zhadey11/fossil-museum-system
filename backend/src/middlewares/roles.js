@@ -1,4 +1,5 @@
 const checkRole = (rolesPermitidos) => {
+  const permitidos = rolesPermitidos.map((r) => Number(r));
   return (req, res, next) => {
     const user = req.user;
 
@@ -8,14 +9,14 @@ const checkRole = (rolesPermitidos) => {
 
     if (user.roles && Array.isArray(user.roles)) {
       const tienePermiso = user.roles.some((r) =>
-        rolesPermitidos.includes(r),
+        permitidos.includes(Number(r)),
       );
 
       if (!tienePermiso) {
         return res.status(403).json({ error: "No tienes permisos" });
       }
     } else {
-      if (!rolesPermitidos.includes(user.rol)) {
+      if (!permitidos.includes(Number(user.rol))) {
         return res.status(403).json({ error: "No tienes permisos" });
       }
     }

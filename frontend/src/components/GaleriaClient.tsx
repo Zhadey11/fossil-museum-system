@@ -4,13 +4,22 @@ import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import type { ItemGaleriaInstalacion } from "@/data/instalacionesGaleria";
 
-type Props = {
-  items: ItemGaleriaInstalacion[];
+type FossilGalleryItem = {
+  id: number;
+  nombre: string;
+  imageSrc: string;
+  categoria?: string | null;
 };
 
-export function GaleriaClient({ items }: Props) {
+type Props = {
+  items: ItemGaleriaInstalacion[];
+  fossils?: FossilGalleryItem[];
+};
+
+export function GaleriaClient({ items, fossils = [] }: Props) {
   const [categoria, setCategoria] = useState("Todas");
   const [active, setActive] = useState<number | null>(null);
+  const [activeFossil, setActiveFossil] = useState<number | null>(null);
   const cats = ["Todas", "Actividades", "Enseñanza", "Instalaciones"];
   const filtered = useMemo(
     () =>
@@ -23,7 +32,10 @@ export function GaleriaClient({ items }: Props) {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setActive(null);
+      if (e.key === "Escape") {
+        setActive(null);
+        setActiveFossil(null);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -85,6 +97,52 @@ export function GaleriaClient({ items }: Props) {
           ))}
         </div>
       </section>
+
+      {fossils.length > 0 ? (
+        <section style={{ maxWidth: "1260px", margin: "0 auto", padding: "0 clamp(1rem, 4vw, 4rem) 2.5rem" }}>
+          <span className="sec-eyebrow">Colección</span>
+          <h2 className="sec-h" style={{ fontSize: "clamp(1.6rem, 2.4vw, 2.3rem)" }}>
+            Fósiles destacados
+          </h2>
+          <div className="sec-rule" />
+          <div
+            style={{
+              marginTop: "1rem",
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+              gap: "0.9rem",
+            }}
+          >
+            {fossils.map((f, idx) => (
+              <figure
+                key={f.id}
+                className="gcard"
+                style={{ minHeight: 280, display: "flex", flexDirection: "column" }}
+              >
+                <button
+                  type="button"
+                  style={{ position: "relative", height: 200, overflow: "hidden" }}
+                  onClick={() => setActiveFossil(idx)}
+                >
+                  <Image
+                    src={f.imageSrc}
+                    alt={f.nombre}
+                    fill
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 33vw, 25vw"
+                    style={{ objectFit: "cover", display: "block" }}
+                  />
+                </button>
+                <figcaption style={{ padding: "0.9rem 1rem 1rem" }}>
+                  <p className="gcard-period">{f.categoria || "Fósil"}</p>
+                  <p className="gcard-name" style={{ fontSize: "1.1rem" }}>
+                    {f.nombre}
+                  </p>
+                </figcaption>
+              </figure>
+            ))}
+          </div>
+        </section>
+      ) : null}
       {active != null && filtered[active] ? (
         <div className="gallery-lightbox" onClick={() => setActive(null)}>
           <button type="button" className="gallery-lb-close" onClick={() => setActive(null)}>
@@ -115,6 +173,42 @@ export function GaleriaClient({ items }: Props) {
             onClick={(e) => {
               e.stopPropagation();
               setActive((v) => (v == null ? 0 : (v + 1) % filtered.length));
+            }}
+          >
+            ›
+          </button>
+        </div>
+      ) : null}
+      {activeFossil != null && fossils[activeFossil] ? (
+        <div className="gallery-lightbox" onClick={() => setActiveFossil(null)}>
+          <button type="button" className="gallery-lb-close" onClick={() => setActiveFossil(null)}>
+            ×
+          </button>
+          <button
+            type="button"
+            className="gallery-lb-nav"
+            onClick={(e) => {
+              e.stopPropagation();
+              setActiveFossil((v) => (v == null ? 0 : (v - 1 + fossils.length) % fossils.length));
+            }}
+          >
+            ‹
+          </button>
+          <div className="gallery-lb-media">
+            <Image
+              src={fossils[activeFossil].imageSrc}
+              alt={fossils[activeFossil].nombre}
+              fill
+              sizes="90vw"
+              style={{ objectFit: "contain" }}
+            />
+          </div>
+          <button
+            type="button"
+            className="gallery-lb-nav"
+            onClick={(e) => {
+              e.stopPropagation();
+              setActiveFossil((v) => (v == null ? 0 : (v + 1) % fossils.length));
             }}
           >
             ›

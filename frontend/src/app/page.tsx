@@ -1,6 +1,5 @@
 import Link from "next/link";
 import Image from "next/image";
-import { DustParticles } from "@/components/DustParticles";
 import { HeroFossilSvg } from "@/components/HeroFossilSvg";
 import { HomeGalleryCarousel, HomeNewsletterForm, HomeStats } from "@/components/HomeSectionsClient";
 import { Reveal } from "@/components/Reveal";
@@ -34,7 +33,6 @@ export default async function Home() {
         <div className="grain" aria-hidden />
         <div className="hero-vignette" aria-hidden />
         <div className="shaft" aria-hidden />
-        <DustParticles />
         <HeroFossilSvg />
 
         <div className="hero-content">

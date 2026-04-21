@@ -34,6 +34,8 @@ CREATE TABLE FOSIL (
     explorador_id            INT           NOT NULL,
     administrador_id         INT           NULL,
     nombre                   VARCHAR(255)  NOT NULL,
+    nombre_comun             VARCHAR(255)  NULL,
+    nombre_cientifico        VARCHAR(255)  NULL,
     slug                     VARCHAR(300)  NOT NULL,
     descripcion_general      VARCHAR(MAX)  NOT NULL,
     descripcion_detallada    VARCHAR(MAX)  NULL,
@@ -43,6 +45,16 @@ CREATE TABLE FOSIL (
     longitud                 DECIMAL(10,7) NULL,
     altitud_msnm             DECIMAL(8,2)  NULL,
     descripcion_ubicacion    VARCHAR(500)  NULL,
+    endurecedor              VARCHAR(80)   NULL,
+    completitud              VARCHAR(80)   NULL,
+    fractura                 VARCHAR(80)   NULL,
+    meteorizacion            VARCHAR(40)   NULL,
+    abrasion                 VARCHAR(40)   NULL,
+    largo_cm                 DECIMAL(10,2) NULL,
+    ancho_cm                 DECIMAL(10,2) NULL,
+    grosor_cm                DECIMAL(10,2) NULL,
+    zona_utm                 VARCHAR(40)   NULL,
+    cantera_sitio            VARCHAR(255)  NULL,
     estado                   VARCHAR(20)   NOT NULL DEFAULT 'pendiente',
     fecha_hallazgo           DATE          NULL,
     fecha_aprobacion         DATETIME2     NULL,
@@ -160,9 +172,14 @@ CREATE TABLE CONTACTO (
     respondido BIT          NOT NULL DEFAULT 0,
     ip_origen  VARCHAR(45)  NULL,
     created_at DATETIME2    NOT NULL DEFAULT GETDATE(),
+    deleted_at DATETIME2    NULL,
     CONSTRAINT PK_CONTACTO       PRIMARY KEY (id),
     CONSTRAINT CK_CONTACTO_email CHECK (email LIKE '%@%.%')
 );
+GO
+
+CREATE NONCLUSTERED INDEX IX_CONTACTO_deleted_at
+    ON dbo.CONTACTO (deleted_at, created_at DESC);
 GO
 
 CREATE TABLE LOG_AUDITORIA (

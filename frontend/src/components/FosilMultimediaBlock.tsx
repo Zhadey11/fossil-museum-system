@@ -23,9 +23,13 @@ const SUBTIPOS: { value: string; label: string }[] = [
 const ACCEPT =
   "image/jpeg,image/png,image/gif,image/webp,video/mp4,video/webm,video/quicktime,video/x-matroska";
 
-type Props = { fosilId: number };
+type Props = {
+  fosilId: number;
+  /** En pendientes de admin: enfatiza revisar material antes de publicar */
+  modoRevision?: boolean;
+};
 
-export function FosilMultimediaBlock({ fosilId }: Props) {
+export function FosilMultimediaBlock({ fosilId, modoRevision = false }: Props) {
   const [items, setItems] = useState<MultimediaRow[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [subtipo, setSubtipo] = useState("general");
@@ -87,8 +91,18 @@ export function FosilMultimediaBlock({ fosilId }: Props) {
     );
   }
 
+  const tipoNorm = (t: string | undefined) => String(t || "").toLowerCase().trim();
+  const urlLooksImage = (u: string | undefined) =>
+    /\.(webp|jpe?g|png|gif|avif)(\?|$)/i.test(String(u || ""));
+  const urlLooksVideo = (u: string | undefined) =>
+    /\.(mp4|webm|mov|mkv)(\?|$)/i.test(String(u || ""));
   const visibles =
-    items?.filter((m) => m.tipo === "imagen" || m.tipo === "video") ?? [];
+    items?.filter((m) => {
+      const t = tipoNorm(m.tipo);
+      if (t === "imagen" || t === "video") return true;
+      if (!t && (urlLooksImage(m.url) || urlLooksVideo(m.url))) return true;
+      return false;
+    }) ?? [];
 
   return (
     <div
@@ -101,6 +115,72 @@ export function FosilMultimediaBlock({ fosilId }: Props) {
         </p>
       ) : null}
 
+      {modoRevision ? (
+        <p className="mb-2 text-sm" style={{ color: "var(--bone)", lineHeight: 1.45 }}>
+          <strong>Material del hallazgo:</strong> revisá estas fotos o videos antes de publicar o
+          rechazar. Si no ves nada, el explorador pudo dar de alta el registro sin imagen o falló la
+          subida (pedile que vuelva a cargar desde su panel o subí vos un archivo abajo).
+        </p>
+      ) : null}
+
+      {visibles.length > 0 ? (
+        <ul
+          className="mb-3 grid list-none gap-3 sm:grid-cols-2"
+          style={{ padding: 0 }}
+        >
+          {visibles.map((m) => (
+            <li
+              key={m.id}
+              className="overflow-hidden rounded-sm border"
+              style={{ borderColor: "var(--border)" }}
+            >
+              {tipoNorm(m.tipo) === "video" ? (
+                <video
+                  src={multimediaAbsUrl(m.url)}
+                  className="h-40 w-full bg-black object-contain"
+                  controls
+                  preload="metadata"
+                />
+              ) : (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={multimediaAbsUrl(m.url)}
+                  alt={m.descripcion || m.nombre_archivo || ""}
+                  className="h-36 w-full object-cover"
+                  loading="lazy"
+                />
+              )}
+              <div className="p-2 text-xs text-[var(--bonedim)]">
+                <div className="text-[var(--bone)]">
+                  {tipoNorm(m.tipo) === "video" ? "Video" : "Imagen"} · {m.subtipo}
+                  {m.nombre_archivo ? ` · ${m.nombre_archivo}` : ""}
+                </div>
+                <button
+                  type="button"
+                  className="mt-1 text-salmon underline"
+                  style={{ color: "salmon" }}
+                  disabled={deletingId === m.id}
+                  onClick={() => setConfirmDeleteId(m.id)}
+                >
+                  {deletingId === m.id ? "…" : "Eliminar"}
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      {items && visibles.length === 0 && !err ? (
+        <p
+          className="mb-3 text-sm"
+          style={{ color: modoRevision ? "var(--amberhot)" : "var(--bonedim)" }}
+        >
+          {modoRevision
+            ? "Sin archivos en el servidor para este hallazgo. No podés validar la foto hasta que exista al menos una imagen o video (explorador o vos con “Añadir archivos”)."
+            : "Aún no hay fotos ni videos."}
+        </p>
+      ) : null}
+
       <div
         className="flex flex-col gap-3 rounded-sm border p-3"
         style={{
@@ -109,15 +189,7 @@ export function FosilMultimediaBlock({ fosilId }: Props) {
         }}
       >
         <p className="text-sm text-[var(--bonedim)]">
-          Subir <strong>fotos</strong> (se optimizan a WebP) o <strong>videos</strong>{" "}
-          (MP4, WebM, MOV; máx. 100 MB). Archivo en{" "}
-          <code className="catalog-code">images/</code> o{" "}
-          <code className="catalog-code">videos/</code>; metadatos en{" "}
-          <code className="catalog-code">MULTIMEDIA</code> vinculados a{" "}
-          <code className="catalog-code">fosil_id</code>. La primera imagen queda
-          como principal (<code className="catalog-code">es_principal</code>).
-          Cuando el fósil esté <code className="catalog-code">publicado</code>,
-          la galería también se muestra en la ficha pública.
+          Añadir archivos (imágenes o video MP4/WebM/MOV; máx. 25 MB por archivo en esta pantalla).
         </p>
         <div className="grid gap-2 sm:grid-cols-2">
           <label className="flex flex-col gap-1 text-sm text-[var(--bonedim)]">
@@ -170,55 +242,6 @@ export function FosilMultimediaBlock({ fosilId }: Props) {
           {uploading ? "Subiendo…" : "Elegir fotos o videos"}
         </button>
       </div>
-
-      {visibles.length > 0 ? (
-        <ul
-          className="mt-3 grid list-none gap-3 sm:grid-cols-2"
-          style={{ padding: 0 }}
-        >
-          {visibles.map((m) => (
-            <li
-              key={m.id}
-              className="overflow-hidden rounded-sm border"
-              style={{ borderColor: "var(--border)" }}
-            >
-              {m.tipo === "video" ? (
-                <video
-                  src={multimediaAbsUrl(m.url)}
-                  className="h-40 w-full bg-black object-contain"
-                  controls
-                  preload="metadata"
-                />
-              ) : (
-                /* eslint-disable-next-line @next/next/no-img-element */
-                <img
-                  src={multimediaAbsUrl(m.url)}
-                  alt={m.descripcion || m.nombre_archivo || ""}
-                  className="h-36 w-full object-cover"
-                  loading="lazy"
-                />
-              )}
-              <div className="p-2 text-xs text-[var(--bonedim)]">
-                <div className="text-[var(--bone)]">
-                  {m.tipo === "video" ? "Video" : "Imagen"} · {m.subtipo}
-                  {m.nombre_archivo ? ` · ${m.nombre_archivo}` : ""}
-                </div>
-                <button
-                  type="button"
-                  className="mt-1 text-salmon underline"
-                  style={{ color: "salmon" }}
-                  disabled={deletingId === m.id}
-                  onClick={() => setConfirmDeleteId(m.id)}
-                >
-                  {deletingId === m.id ? "…" : "Eliminar"}
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      ) : items && visibles.length === 0 ? (
-        <p className="mt-2 text-sm opacity-75">Aún no hay fotos ni videos.</p>
-      ) : null}
       <ConfirmDialog
         open={confirmDeleteId != null}
         title="Eliminar archivo"

@@ -2,13 +2,19 @@
   "name": "fossil-museum-system",
   "private": true,
   "scripts": {
+    "clean:next": "node -e \"const fs=require('fs');const p=require('path').join('frontend','.next');try{fs.rmSync(p,{recursive:true,force:true});console.log('Removed',p);}catch(e){if(e.code!=='ENOENT')throw e;}\"",
     "dev": "npm run dev --prefix frontend",
     "dev:backend": "npm run dev --prefix backend",
     "dev:all": "concurrently -n backend,web -c cyan,magenta \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
     "build": "npm run build --prefix frontend",
     "start": "npm run start --prefix frontend",
     "lint": "npm run lint --prefix frontend",
-    "verify:contracts": "node backend/scripts/verify-contracts.js"
+    "verify:contracts": "node backend/scripts/verify-contracts.js",
+    "verify:media": "npm run check:media --prefix backend",
+    "sync:fossil-images": "npm run sync:images --prefix backend",
+    "audit:media-consistency": "npm run audit:media-consistency --prefix backend",
+    "fix:media-filename-dups": "npm run fix:media-filename-dups --prefix backend",
+    "fix:media-filename-dups:apply": "npm run fix:media-filename-dups:apply --prefix backend"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

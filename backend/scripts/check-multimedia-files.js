@@ -3,15 +3,7 @@ const fs = require("fs");
 const path = require("path");
 require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
 const { pool, poolConnect } = require("../src/config/db");
-
-const BACKEND_ROOT = path.join(__dirname, "..");
-
-function toDiskPath(urlPath) {
-  if (typeof urlPath !== "string") return null;
-  if (!urlPath.startsWith("/images/") && !urlPath.startsWith("/videos/")) return null;
-  const relative = urlPath.replace(/^\//, "").split("/").join(path.sep);
-  return path.join(BACKEND_ROOT, relative);
-}
+const { diskPathFromPublicUrl } = require("../src/config/paths");
 
 async function fetchMediaRows() {
   const result = await pool.request().query(`
@@ -19,7 +11,7 @@ async function fetchMediaRows() {
     FROM MULTIMEDIA
     WHERE deleted_at IS NULL
       AND url IS NOT NULL
-      AND (url LIKE '/images/%' OR url LIKE '/videos/%')
+      AND (url LIKE '/images/%' OR url LIKE '/videos/%' OR url LIKE '/uploads/%')
     ORDER BY id ASC
   `);
   return result.recordset || [];
@@ -32,7 +24,7 @@ async function main() {
   let ok = 0;
 
   for (const row of rows) {
-    const diskPath = toDiskPath(row.url);
+    const diskPath = diskPathFromPublicUrl(row.url);
     if (!diskPath) continue;
     if (fs.existsSync(diskPath)) {
       ok += 1;

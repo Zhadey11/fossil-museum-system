@@ -5,11 +5,18 @@ const { pool, poolConnect } = require("../src/config/db");
 
 const ROOT = path.join(__dirname, "..", "images", "fossiles");
 const EXT_OK = new Set([".jpg", ".jpeg", ".png", ".webp", ".avif", ".gif"]);
+/*
+ * Carpetas físicas → categoria_id de FOSIL (05_datos_prueba.sql):
+ * 1 FOS, 2 MIN, 3 ROC, 4 PAL.
+ * "mineralizados" aloja fósiles petrificados (amonitas, trilobites), no minerales sueltos → PAL.
+ */
 const CAT_BY_FOLDER = {
   generales: 1,
-  mineralizados: 2,
+  mineralizados: 4,
+  minerales: 2,
   rocas: 3,
   "paleontologico-especifico": 4,
+  excavaciones: 4,
 };
 
 function normalizeExt(ext) {
@@ -19,9 +26,11 @@ function normalizeExt(ext) {
 
 function pickSubtipo(name) {
   const n = name.toLowerCase();
+  if (n.includes("excavacion") || n.includes("excavación")) return "antes";
   if (n.includes("antes")) return "antes";
   if (n.includes("despues") || n.includes("después")) return "despues";
   if (n.includes("analisis") || n.includes("análisis")) return "analisis";
+  if (n.includes("portada")) return "portada";
   return "general";
 }
 

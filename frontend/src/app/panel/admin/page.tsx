@@ -699,7 +699,7 @@ function AdminContent() {
             marginBottom: "1.25rem",
           }}
         >
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(180px, 1fr))", gap: "0.75rem" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(140px, 1fr))", gap: "0.75rem" }}>
             <StatCard label="Hallazgos pendientes" value={totalPendientes} />
             <StatCard label="Solicitudes investigación" value={solicitudesPendientes} />
             <StatCard label="Usuarios activos" value={usuariosActivos} />
@@ -952,11 +952,11 @@ function AdminContent() {
                         colSpan={5}
                         style={{ paddingTop: "0.25rem", paddingBottom: "1rem", borderTop: "none" }}
                       >
-                        <details>
+                        <details open>
                           <summary className="cursor-pointer text-sm text-[var(--bonedim)]">
-                            Fotos y videos
+                            Fotos y videos del hallazgo (revisar antes de publicar)
                           </summary>
-                          <FosilMultimediaBlock fosilId={r.id} />
+                          <FosilMultimediaBlock fosilId={r.id} modoRevision />
                         </details>
                       </td>
                     </tr>

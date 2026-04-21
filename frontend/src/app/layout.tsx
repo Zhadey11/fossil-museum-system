@@ -1,32 +1,19 @@
 import type { Metadata } from "next";
-import { Cormorant, Cormorant_Garamond, Source_Sans_3 } from "next/font/google";
-import { CustomCursor } from "@/components/CustomCursor";
 import { SiteFooter } from "@/components/SiteFooter";
 import { TopNav } from "@/components/TopNav";
 import "./globals.css";
 
-/** Texto UI, nav, botones, párrafos (.sec-body, .hero-sub): Source Sans 3 */
-const sourceSans = Source_Sans_3({
-  variable: "--font-ui",
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600"],
-});
-
-/** Títulos de sección .sec-h, hero em, timeline .tl-name: Cormorant */
-const cormorant = Cormorant({
-  variable: "--font-cormorant",
-  subsets: ["latin"],
-  weight: ["300", "400", "600", "700"],
-  style: ["normal", "italic"],
-});
-
-/** Marca “StoneWake”, números destacados, citas: Cormorant Garamond */
-const cormorantGaramond = Cormorant_Garamond({
-  variable: "--font-cormorant-garamond",
-  subsets: ["latin"],
-  weight: ["300", "400", "600"],
-  style: ["normal", "italic"],
-});
+/**
+ * Fuentes: Google Fonts por <link> (evita bug de Turbopack con next/font/google
+ * “Can't resolve @vercel/turbopack-next/internal/font/google/font”).
+ * Familias definidas en globals.css :root → --font-ui, --font-cormorant, --font-cormorant-garamond.
+ */
+const googleFontsHref =
+  "https://fonts.googleapis.com/css2?" +
+  "family=Cormorant:ital,wght@0,300;0,400;0,600;0,700;1,300;1,400;1,600;1,700&" +
+  "family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400;1,600&" +
+  "family=Source+Sans+3:wght@300;400;500;600&" +
+  "display=swap";
 
 export const metadata: Metadata = {
   title: {
@@ -44,11 +31,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" suppressHydrationWarning>
-      <body
-        className={`${sourceSans.variable} ${cormorant.variable} ${cormorantGaramond.variable} antialiased`}
-        suppressHydrationWarning
-      >
-        <CustomCursor />
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link href={googleFontsHref} rel="stylesheet" />
+      </head>
+      <body className="antialiased" suppressHydrationWarning>
         <TopNav />
         {children}
         <SiteFooter />
