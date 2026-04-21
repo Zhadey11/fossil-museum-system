@@ -1,0 +1,73 @@
+version: '3.8'
+
+services:
+
+  # ─── Base de datos SQL Server ───────────────────────────
+  db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: fossil_db
+    restart: always
+    environment:
+      ACCEPT_EULA: "Y"
+      SA_PASSWORD: "FossilMuseum123!"
+      MSSQL_PID: "Express"
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+    networks:
+      - fossil_network
+
+  # ─── Backend Node.js ────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: fossil_backend
+    restart: always
+    depends_on:
+      - db
+    environment:
+      NODE_ENV: development
+      PORT: 3001
+      DB_HOST: db
+      DB_PORT: 1433
+      DB_USER: sa
+      DB_PASSWORD: "FossilMuseum123!"
+      DB_NAME: fossil_museum
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    networks:
+      - fossil_network
+
+  # ─── Frontend Next.js ───────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: fossil_frontend
+    restart: always
+    depends_on:
+      - backend
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    networks:
+      - fossil_network
+
+# ─── Volúmenes ──────────────────────────────────────────
+volumes:
+  sqlserver_data:
+
+# ─── Red compartida ─────────────────────────────────────
+networks:
+  fossil_network:
+    driver: bridge
