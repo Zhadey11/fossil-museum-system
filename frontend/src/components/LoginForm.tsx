@@ -13,16 +13,26 @@ export function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [attemptedSubmit, setAttemptedSubmit] = useState(false);
   const emailTrim = email.trim();
   const passTrim = password.trim();
   const emailInvalid =
     emailTrim.length > 0 && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrim);
   const passInvalid = passTrim.length > 0 && passTrim.length < 6;
   const canSubmit = !loading && !emailInvalid && !passInvalid && emailTrim.length > 0 && passTrim.length > 0;
+  const missingEmail = attemptedSubmit && (emailTrim.length === 0 || emailInvalid);
+  const missingPass = attemptedSubmit && (passTrim.length === 0 || passInvalid);
+  const inputBorder = (missing = false) =>
+    missing ? "1px solid salmon" : "1px solid var(--border)";
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setAttemptedSubmit(true);
     setError(null);
+    if (!canSubmit) {
+      window.alert("Completá correo y contraseña válidos antes de entrar.");
+      return;
+    }
     setLoading(true);
     try {
       const data = await postLogin({
@@ -44,6 +54,7 @@ export function LoginForm() {
       className="flex flex-col gap-5"
       aria-label="Iniciar sesión"
       onSubmit={onSubmit}
+      noValidate
     >
       {error ? (
         <p
@@ -60,7 +71,7 @@ export function LoginForm() {
       ) : null}
       <div className="flex flex-col gap-2 text-left">
         <label htmlFor="login-email" className="text-sm text-[var(--bonedim)]">
-          Correo
+          Correo {missingEmail ? <span style={{ color: "salmon" }}>*</span> : null}
         </label>
         <input
           id="login-email"
@@ -74,7 +85,7 @@ export function LoginForm() {
           className="rounded-sm border px-3 py-2.5 text-[var(--bone)] placeholder:text-[var(--bonedim)]/50"
           style={{
             background: "var(--surface)",
-            borderColor: "var(--border)",
+            border: inputBorder(missingEmail),
           }}
         />
         {emailInvalid ? (
@@ -83,7 +94,7 @@ export function LoginForm() {
       </div>
       <div className="flex flex-col gap-2 text-left">
         <label htmlFor="login-pass" className="text-sm text-[var(--bonedim)]">
-          Contraseña
+          Contraseña {missingPass ? <span style={{ color: "salmon" }}>*</span> : null}
         </label>
         <div className="relative">
           <input
@@ -98,7 +109,7 @@ export function LoginForm() {
             className="w-full rounded-sm border py-2.5 pl-3 pr-11 text-[var(--bone)] placeholder:text-[var(--bonedim)]/50"
             style={{
               background: "var(--surface)",
-              borderColor: "var(--border)",
+              border: inputBorder(missingPass),
             }}
           />
           <button
@@ -153,7 +164,7 @@ export function LoginForm() {
       <button
         type="submit"
         className="btn-fill mt-2 w-full"
-        disabled={!canSubmit}
+        disabled={loading}
       >
         {loading ? "Entrando…" : "Entrar"}
       </button>

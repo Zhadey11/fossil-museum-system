@@ -32,6 +32,19 @@ export function ContactForm() {
   const [status, setStatus] = useState<"idle" | "ok" | "err">("idle");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [attemptedSubmit, setAttemptedSubmit] = useState(false);
+  const investigatorFields = [
+    "Institución / centro de trabajo",
+    "Profesión",
+    "Campo de investigación",
+    "Código de verificación institucional",
+    "País",
+  ] as const;
+  const explorerFields = [
+    "Región donde opera",
+    "Experiencia en campo",
+    "Código de verificación",
+  ] as const;
   const emailTrim = email.trim();
   const emailInvalid =
     emailTrim.length > 0 && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrim);
@@ -41,7 +54,12 @@ export function ContactForm() {
     nombre.trim().length >= 2 &&
     asunto.trim().length >= 3 &&
     mensaje.trim().length >= 12 &&
-    !emailInvalid;
+    !emailInvalid &&
+    (motivo !== "Quiero ser investigador" ||
+      (investigatorFields.every((k) => (extra[k] || "").trim().length > 0) &&
+        selectedFossils.length > 0)) &&
+    (motivo !== "Quiero ser explorador" ||
+      explorerFields.every((k) => (extra[k] || "").trim().length > 0));
 
   useEffect(() => {
     if (motivo !== "Quiero ser investigador") return;
@@ -104,9 +122,59 @@ export function ContactForm() {
     .split(",")
     .map((x) => x.trim())
     .filter(Boolean);
+  const isMissingInvestigator = (key: (typeof investigatorFields)[number]) =>
+    motivo === "Quiero ser investigador" &&
+    attemptedSubmit &&
+    (extra[key] || "").trim().length === 0;
+  const isMissingExplorer = (key: (typeof explorerFields)[number]) =>
+    motivo === "Quiero ser explorador" &&
+    attemptedSubmit &&
+    (extra[key] || "").trim().length === 0;
+  const baseMissing = {
+    nombre: attemptedSubmit && nombre.trim().length < 2,
+    email: attemptedSubmit && (emailTrim.length === 0 || emailInvalid),
+    asunto: attemptedSubmit && asunto.trim().length < 3,
+    mensaje: attemptedSubmit && mensaje.trim().length < 12,
+    fossils:
+      motivo === "Quiero ser investigador" &&
+      attemptedSubmit &&
+      selectedFossils.length === 0,
+  };
+  const inputBorder = (missing = false) =>
+    missing ? "1px solid salmon" : "1px solid var(--border)";
+  const extraBorder = (missing = false) =>
+    missing ? "1px solid salmon" : "1px solid rgba(200,146,42,.45)";
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setAttemptedSubmit(true);
+    if (motivo === "Quiero ser investigador") {
+      const faltantes = investigatorFields.filter(
+        (k) => (extra[k] || "").trim().length === 0,
+      );
+      if (selectedFossils.length === 0) faltantes.push("Fósiles de interés");
+      if (faltantes.length > 0) {
+        window.alert(
+          `Completá todos los campos obligatorios para investigador:\n- ${faltantes.join("\n- ")}`,
+        );
+        return;
+      }
+    }
+    if (motivo === "Quiero ser explorador") {
+      const faltantes = explorerFields.filter(
+        (k) => (extra[k] || "").trim().length === 0,
+      );
+      if (faltantes.length > 0) {
+        window.alert(
+          `Completá todos los campos obligatorios para explorador:\n- ${faltantes.join("\n- ")}`,
+        );
+        return;
+      }
+    }
+    if (!canSubmit) {
+      window.alert("Completá todos los campos obligatorios antes de enviar.");
+      return;
+    }
     setLoading(true);
     setStatus("idle");
     try {
@@ -122,6 +190,8 @@ export function ContactForm() {
       setEmail("");
       setAsunto("");
       setMensaje("");
+      setExtra({});
+      setAttemptedSubmit(false);
     } catch (err) {
       setStatus("err");
       setMessage(err instanceof Error ? err.message : "No se pudo enviar");
@@ -135,6 +205,7 @@ export function ContactForm() {
       className="flex flex-col gap-5"
       aria-label="Formulario de contacto"
       onSubmit={onSubmit}
+      noValidate
     >
       {status !== "idle" ? (
         <p
@@ -181,18 +252,18 @@ export function ContactForm() {
               key={f}
               value={extra[f] || ""}
               onChange={(e) => setExtraField(f, e.target.value)}
-              placeholder={f}
+              placeholder={`${f}${isMissingInvestigator(f as (typeof investigatorFields)[number]) ? " *" : ""}`}
               className="rounded-sm border px-3 py-2.5 text-[var(--bone)] placeholder:text-[var(--bonedim)]/60"
-              style={{ background: "var(--surface)", borderColor: "rgba(200,146,42,.45)" }}
+              style={{ background: "var(--surface)", border: extraBorder(isMissingInvestigator(f as (typeof investigatorFields)[number])) }}
             />
           ))}
           <select
             value={extra["País"] || ""}
             onChange={(e) => setExtraField("País", e.target.value)}
             className="rounded-sm border px-3 py-2.5 text-[var(--bone)]"
-            style={{ background: "var(--surface)", borderColor: "rgba(200,146,42,.45)" }}
+            style={{ background: "var(--surface)", border: extraBorder(isMissingInvestigator("País")) }}
           >
-            <option value="">País</option>
+              <option value="">País{isMissingInvestigator("País") ? " *" : ""}</option>
             {COUNTRY_OPTIONS.map((country) => (
               <option key={country} value={country}>
                 {country}
@@ -203,12 +274,12 @@ export function ContactForm() {
             className="rounded-sm border px-3 py-2.5 text-[var(--bone)]"
             style={{
               background: "var(--surface)",
-              borderColor: "rgba(200,146,42,.45)",
+              border: extraBorder(attemptedSubmit && selectedFossils.length === 0),
               gridColumn: "1 / -1",
             }}
           >
             <p className="text-sm text-[var(--bonedim)]" style={{ marginBottom: "0.4rem" }}>
-              Fósiles de interés
+              Fósiles de interés {baseMissing.fossils ? <span style={{ color: "salmon" }}>*</span> : null}
             </p>
             {loadingFossils ? (
               <p className="text-sm text-[var(--bonedim)]">Cargando fósiles publicados…</p>
@@ -275,16 +346,16 @@ export function ContactForm() {
               key={f}
               value={extra[f] || ""}
               onChange={(e) => setExtra((prev) => ({ ...prev, [f]: e.target.value }))}
-              placeholder={f}
+              placeholder={`${f}${isMissingExplorer(f as (typeof explorerFields)[number]) ? " *" : ""}`}
               className="rounded-sm border px-3 py-2.5 text-[var(--bone)] placeholder:text-[var(--bonedim)]/60"
-              style={{ background: "var(--surface)", borderColor: "rgba(200,146,42,.45)" }}
+              style={{ background: "var(--surface)", border: extraBorder(isMissingExplorer(f as (typeof explorerFields)[number])) }}
             />
           ))}
         </div>
       ) : null}
       <div className="flex flex-col gap-2">
         <label htmlFor="contact-name" className="text-sm text-[var(--bonedim)]">
-          Nombre
+          Nombre {baseMissing.nombre ? <span style={{ color: "salmon" }}>*</span> : null}
         </label>
         <input
           id="contact-name"
@@ -297,7 +368,7 @@ export function ContactForm() {
           className="rounded-sm border px-3 py-2.5 text-[var(--bone)] placeholder:text-[var(--bonedim)]/50"
           style={{
             background: "var(--surface)",
-            borderColor: "var(--border)",
+            border: inputBorder(baseMissing.nombre),
           }}
         />
         {emailInvalid ? (
@@ -306,7 +377,7 @@ export function ContactForm() {
       </div>
       <div className="flex flex-col gap-2">
         <label htmlFor="contact-email" className="text-sm text-[var(--bonedim)]">
-          Correo
+          Correo {baseMissing.email ? <span style={{ color: "salmon" }}>*</span> : null}
         </label>
         <input
           id="contact-email"
@@ -319,13 +390,13 @@ export function ContactForm() {
           className="rounded-sm border px-3 py-2.5 text-[var(--bone)] placeholder:text-[var(--bonedim)]/50"
           style={{
             background: "var(--surface)",
-            borderColor: "var(--border)",
+            border: inputBorder(baseMissing.email),
           }}
         />
       </div>
       <div className="flex flex-col gap-2">
         <label htmlFor="contact-subject" className="text-sm text-[var(--bonedim)]">
-          Asunto
+          Asunto {baseMissing.asunto ? <span style={{ color: "salmon" }}>*</span> : null}
         </label>
         <input
           id="contact-subject"
@@ -338,13 +409,13 @@ export function ContactForm() {
           className="rounded-sm border px-3 py-2.5 text-[var(--bone)] placeholder:text-[var(--bonedim)]/50"
           style={{
             background: "var(--surface)",
-            borderColor: "var(--border)",
+            border: inputBorder(baseMissing.asunto),
           }}
         />
       </div>
       <div className="flex flex-col gap-2">
         <label htmlFor="contact-msg" className="text-sm text-[var(--bonedim)]">
-          Mensaje
+          Mensaje {baseMissing.mensaje ? <span style={{ color: "salmon" }}>*</span> : null}
         </label>
         <textarea
           id="contact-msg"
@@ -357,14 +428,14 @@ export function ContactForm() {
           className="resize-none rounded-sm border px-3 py-2.5 text-[var(--bone)] placeholder:text-[var(--bonedim)]/50"
           style={{
             background: "var(--surface)",
-            borderColor: "var(--border)",
+            border: inputBorder(baseMissing.mensaje),
           }}
         />
         {msgShort ? (
           <p className="text-xs text-[salmon]">El mensaje debe tener al menos 12 caracteres.</p>
         ) : null}
       </div>
-      <button type="submit" className="btn-out" disabled={!canSubmit}>
+      <button type="submit" className="btn-out" disabled={loading}>
         {loading ? "Enviando…" : "Enviar"}
       </button>
     </form>

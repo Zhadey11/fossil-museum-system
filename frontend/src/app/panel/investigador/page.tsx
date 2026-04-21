@@ -26,6 +26,7 @@ function InvestigadorContent() {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [sending, setSending] = useState(false);
   const [okMsg, setOkMsg] = useState<string | null>(null);
+  const [attemptedSubmit, setAttemptedSubmit] = useState(false);
   const [filtroNombre, setFiltroNombre] = useState("");
   const [filtroEstado, setFiltroEstado] = useState("");
   const [tab, setTab] = useState<"solicitudes" | "investigando">("solicitudes");
@@ -59,6 +60,13 @@ function InvestigadorContent() {
     e.preventDefault();
     setErr(null);
     setOkMsg(null);
+    setAttemptedSubmit(true);
+    if (selected.size === 0 || asunto.trim().length < 3 || mensaje.trim().length < 12) {
+      window.alert(
+        "Completá todos los campos obligatorios (fósiles, asunto y objetivo de investigación) antes de enviar.",
+      );
+      return;
+    }
     setSending(true);
     try {
       const fosil_ids = [...selected];
@@ -98,6 +106,11 @@ function InvestigadorContent() {
     const byEstado = filtroEstado ? r.estado === filtroEstado : true;
     return byName && byEstado;
   });
+  const missingSolicitud = {
+    fosiles: attemptedSubmit && selected.size === 0,
+    asunto: attemptedSubmit && asunto.trim().length < 3,
+    objetivo: attemptedSubmit && mensaje.trim().length < 12,
+  };
 
   return (
     <>
@@ -161,6 +174,7 @@ function InvestigadorContent() {
         onSubmit={onSubmit}
         className="sec-body"
         style={{ marginBottom: "2rem", maxWidth: "42rem" }}
+        noValidate
       >
         <p style={{ marginBottom: "0.75rem", fontSize: "0.9rem", opacity: 0.9 }}>
           Seleccioná los fósiles que necesitás estudiar:
@@ -169,7 +183,7 @@ function InvestigadorContent() {
           style={{
             maxHeight: "14rem",
             overflow: "auto",
-            border: "1px solid var(--border)",
+            border: missingSolicitud.fosiles ? "1px solid salmon" : "1px solid var(--border)",
             borderRadius: "6px",
             padding: "0.5rem 0.75rem",
             marginBottom: "1rem",
@@ -204,22 +218,32 @@ function InvestigadorContent() {
           )}
         </div>
         <label className="block mb-2">
-          <span className="text-sm text-[var(--bonedim)]">Asunto</span>
+          <span className="text-sm text-[var(--bonedim)]">
+            Asunto {missingSolicitud.asunto ? <span style={{ color: "salmon" }}>*</span> : null}
+          </span>
           <input
             className="mt-1 w-full rounded border bg-transparent px-2 py-1.5 text-[var(--bone)]"
-            style={{ borderColor: "var(--border)" }}
+            style={{
+              borderColor:
+                missingSolicitud.asunto ? "salmon" : "var(--border)",
+            }}
             value={asunto}
             onChange={(e) => setAsunto(e.target.value)}
             placeholder="Ej. Análisis microestructural de muestras"
+            required
           />
         </label>
         <label className="block mb-3">
           <span className="text-sm text-[var(--bonedim)]">
-            Qué querés investigar (objetivo)
+            Qué querés investigar (objetivo) {missingSolicitud.objetivo ? <span style={{ color: "salmon" }}>*</span> : null}
           </span>
           <textarea
             className="mt-1 w-full rounded border bg-transparent px-2 py-2 text-[var(--bone)]"
-            style={{ borderColor: "var(--border)", minHeight: "6rem" }}
+            style={{
+              borderColor:
+                missingSolicitud.objetivo ? "salmon" : "var(--border)",
+              minHeight: "6rem",
+            }}
             required
             value={mensaje}
             onChange={(e) => setMensaje(e.target.value)}
@@ -228,13 +252,13 @@ function InvestigadorContent() {
         </label>
         <button
           type="submit"
-          disabled={sending || selected.size === 0}
+          disabled={sending}
           className="rounded-sm border px-4 py-2 text-sm font-medium"
           style={{
             borderColor: "var(--amber)",
             color: "var(--ink)",
             background: "var(--amber)",
-            opacity: sending || selected.size === 0 ? 0.6 : 1,
+            opacity: sending ? 0.6 : 1,
           }}
         >
           {sending ? "Enviando…" : "Enviar solicitud al administrador"}

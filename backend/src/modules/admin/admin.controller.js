@@ -13,7 +13,7 @@ const aprobar = async (req, res) => {
     const data = await aprobarFosil(req.params.id, req.user.id);
     res.json(data);
   } catch (error) {
-    res.status(500).json({
+    res.status(error.statusCode || 500).json({
       error: error.message || "Error al aprobar fósil",
     });
   }

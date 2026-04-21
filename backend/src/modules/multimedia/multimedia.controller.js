@@ -29,6 +29,14 @@ function formatoDesdeExtension(ext) {
   return s || null;
 }
 
+function carpetaImagenPorCategoriaId(categoriaId) {
+  const id = Number(categoriaId);
+  if (id === 4) return "paleontologico-especifico";
+  if (id === 2) return "minerales";
+  if (id === 3) return "rocas";
+  return "generales";
+}
+
 function readUploadedFile(file) {
   if (file?.buffer) return file.buffer;
   if (file?.path && fs.existsSync(file.path)) {
@@ -143,7 +151,11 @@ const uploadParaFosil = async (req, res) => {
       return res.status(400).json({ error: "fosil_id requerido" });
     }
     const fosil = await service.assertAccesoFosil(req.user, fosil_id);
-    const subdir = fosil.estado === "pendiente" ? "pending" : "fossiles";
+    const imageSubdir =
+      fosil.estado === "pendiente"
+        ? "pending"
+        : path.join("fossiles", carpetaImagenPorCategoriaId(fosil.categoria_id));
+    const videoSubdir = fosil.estado === "pendiente" ? "pending" : "fossiles";
 
     const uploaded = [];
     for (const file of files) {
@@ -163,11 +175,11 @@ const uploadParaFosil = async (req, res) => {
       if (video) {
         const ext = videoExtension(file);
         const baseName = `fosil_${fosil_id}_${crypto.randomUUID()}${ext}`;
-        const absDir = path.join(VIDEOS_DIR, subdir);
+        const absDir = path.join(VIDEOS_DIR, videoSubdir);
         fs.mkdirSync(absDir, { recursive: true });
         absPath = path.join(absDir, baseName);
         fs.writeFileSync(absPath, inputBuffer);
-        url = `/videos/${subdir}/${baseName}`;
+        url = `/videos/${videoSubdir.replaceAll(path.sep, "/")}/${baseName}`;
         tipoMultimedia = "video";
         formato = formatoDesdeExtension(ext);
         tamanoBytes = inputBuffer.length;
@@ -183,11 +195,11 @@ const uploadParaFosil = async (req, res) => {
           });
         }
         const baseName = `fosil_${fosil_id}_${crypto.randomUUID()}.webp`;
-        const absDir = path.join(IMAGES_DIR, subdir);
+        const absDir = path.join(IMAGES_DIR, imageSubdir);
         fs.mkdirSync(absDir, { recursive: true });
         absPath = path.join(absDir, baseName);
         fs.writeFileSync(absPath, procesado);
-        url = `/images/${subdir}/${baseName}`;
+        url = `/images/${imageSubdir.replaceAll(path.sep, "/")}/${baseName}`;
         tipoMultimedia = "imagen";
         formato = "webp";
         tamanoBytes = procesado.length;

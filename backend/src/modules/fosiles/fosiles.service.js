@@ -1,5 +1,52 @@
 const { pool } = require("../../config/db");
 
+async function obtenerOCrearTaxonomiaId(data) {
+  const reino = String(data.reino || "").trim();
+  const filo = String(data.filo || "").trim();
+  const clase = String(data.clase || "").trim();
+  const orden = String(data.orden || "").trim();
+  const familia = String(data.familia || "").trim();
+  const genero = String(data.genero || "").trim();
+  const especie = String(data.especie || "").trim();
+  if (!reino || !filo || !clase || !orden || !familia || !genero || !especie) return null;
+  const found = await pool
+    .request()
+    .input("reino", reino)
+    .input("filo", filo)
+    .input("clase", clase)
+    .input("orden", orden)
+    .input("familia", familia)
+    .input("genero", genero)
+    .input("especie", especie)
+    .query(`
+      SELECT TOP 1 id
+      FROM TAXONOMIA
+      WHERE reino = @reino
+        AND filo = @filo
+        AND clase = @clase
+        AND orden = @orden
+        AND familia = @familia
+        AND genero = @genero
+        AND especie = @especie
+    `);
+  if (found.recordset?.[0]?.id) return Number(found.recordset[0].id);
+  const created = await pool
+    .request()
+    .input("reino", reino)
+    .input("filo", filo)
+    .input("clase", clase)
+    .input("orden", orden)
+    .input("familia", familia)
+    .input("genero", genero)
+    .input("especie", especie)
+    .query(`
+      INSERT INTO TAXONOMIA (reino, filo, clase, orden, familia, genero, especie)
+      VALUES (@reino, @filo, @clase, @orden, @familia, @genero, @especie);
+      SELECT CAST(SCOPE_IDENTITY() AS INT) AS id;
+    `);
+  return Number(created.recordset?.[0]?.id || 0) || null;
+}
+
 const PUBLIC_COLUMNS = `
   f.id,
   f.canton_id,
@@ -366,7 +413,32 @@ const crearFosil = async (data, user) => {
       ? result.recordsets[result.recordsets.length - 1]
       : result.recordset;
   const row = lastRs?.[0] || {};
-  return { id: row.id, codigo_unico: row.codigo_unico };
+  const nuevoId = row.id;
+  if (nuevoId) {
+    const taxonomiaId = await obtenerOCrearTaxonomiaId(data);
+    await pool
+      .request()
+      .input("id", nuevoId)
+      .input("descripcion_general", data.descripcion_general || null)
+      .input("nombre_comun", data.nombre_comun || null)
+      .input("nombre_cientifico", data.nombre_cientifico || null)
+      .input("contexto_geologico", data.contexto_geologico || null)
+      .input("descripcion_detallada", data.descripcion_detallada || null)
+      .input("taxonomia_id", taxonomiaId)
+      .query(`
+        UPDATE FOSIL
+        SET
+          descripcion_general = COALESCE(@descripcion_general, descripcion_general),
+          nombre_comun = @nombre_comun,
+          nombre_cientifico = @nombre_cientifico,
+          contexto_geologico = @contexto_geologico,
+          descripcion_detallada = @descripcion_detallada,
+          taxonomia_id = COALESCE(@taxonomia_id, taxonomia_id),
+          updated_at = GETDATE()
+        WHERE id = @id
+      `);
+  }
+  return { id: nuevoId, codigo_unico: row.codigo_unico };
 };
 
 const eliminarFosil = async (id) => {

@@ -145,6 +145,23 @@ function formatInboxDate(raw: string): string {
   return d.toLocaleDateString("es-CR", { day: "numeric", month: "short" });
 }
 
+function formatHallazgoDate(raw?: string | null): string {
+  if (!raw) return "—";
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return String(raw);
+  return d.toLocaleDateString("es-CR", { year: "numeric", month: "2-digit", day: "2-digit" });
+}
+
+function fichaCompleta(row?: ApiFosilRow | null): boolean {
+  if (!row) return false;
+  return Boolean(
+    String(row.descripcion_general || "").trim() &&
+      String(row.nombre_comun || "").trim() &&
+      String(row.nombre_cientifico || "").trim() &&
+      String(row.contexto_geologico || "").trim(),
+  );
+}
+
 function roleBadgeColor(role: string) {
   const r = role.toLowerCase();
   if (r.includes("administrador")) return "rgba(200,130,10,.22)";
@@ -892,7 +909,8 @@ function AdminContent() {
                   <th>Fósil</th>
                   <th>Explorador</th>
                   <th>Ubicación</th>
-                  <th>Fecha</th>
+                  <th>Ficha</th>
+                  <th>Fecha hallazgo</th>
                   <th>Acciones</th>
                 </tr>
               </thead>
@@ -915,7 +933,29 @@ function AdminContent() {
                         }
                       </td>
                       <td>{(todos.find((t) => t.id === r.id)?.descripcion_ubicacion as string) || "—"}</td>
-                      <td>{formatInboxDate(typeof r.created_at === "string" ? r.created_at : String(r.created_at))}</td>
+                      <td>
+                        {(() => {
+                          const full = todos.find((t) => t.id === r.id);
+                          const ok = fichaCompleta(full);
+                          return (
+                            <span
+                              className="rounded-full border px-2 py-0.5 text-xs"
+                              style={{
+                                borderColor: ok ? "rgba(30,140,70,.5)" : "rgba(170,70,70,.5)",
+                                color: ok ? "#9be3b8" : "#ffb0a8",
+                              }}
+                            >
+                              {ok ? "Completa" : "Incompleta"}
+                            </span>
+                          );
+                        })()}
+                      </td>
+                      <td>
+                        {formatHallazgoDate(
+                          (todos.find((t) => t.id === r.id)?.fecha_hallazgo as string | null) ||
+                            (typeof r.created_at === "string" ? r.created_at : String(r.created_at)),
+                        )}
+                      </td>
                       <td>
                         <div className="flex flex-wrap gap-2">
                           <button
@@ -949,7 +989,7 @@ function AdminContent() {
                     </tr>
                     <tr>
                       <td
-                        colSpan={5}
+                        colSpan={6}
                         style={{ paddingTop: "0.25rem", paddingBottom: "1rem", borderTop: "none" }}
                       >
                         <details open>

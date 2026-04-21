@@ -1,4 +1,7 @@
 const { pool } = require("../../config/db");
+const fs = require("fs");
+const path = require("path");
+const { diskPathFromPublicUrl } = require("../../config/paths");
 const nodemailer = require("nodemailer");
 const suscriptoresService = require("../suscriptores/suscriptores.service");
 
@@ -65,12 +68,157 @@ async function notificarExploradorEstado({ fosilId, nombreFosil, estado }) {
   }
 }
 
+function carpetaObjetivoPorCategoria(categoriaCodigo) {
+  const code = String(categoriaCodigo || "").toUpperCase().trim();
+  if (code === "PAL") return "paleontologico-especifico";
+  if (code === "MIN") return "minerales";
+  if (code === "ROC") return "rocas";
+  return "generales";
+}
+
+async function moverMultimediaDePendingAFinal(fosilId) {
+  const info = await pool.request().input("id", fosilId).query(`
+    SELECT TOP 1
+      f.id,
+      f.categoria_id,
+      cf.codigo AS categoria_codigo
+    FROM FOSIL f
+    LEFT JOIN CATEGORIA_FOSIL cf ON cf.id = f.categoria_id
+    WHERE f.id = @id
+      AND f.deleted_at IS NULL
+  `);
+  const fosil = info.recordset?.[0];
+  if (!fosil) return;
+
+  const targetFolder = carpetaObjetivoPorCategoria(fosil.categoria_codigo);
+  const mm = await pool.request().input("fosil_id", fosilId).query(`
+    SELECT id, url
+    FROM MULTIMEDIA
+    WHERE fosil_id = @fosil_id
+      AND deleted_at IS NULL
+    ORDER BY id ASC
+  `);
+  const rows = mm.recordset || [];
+  for (const row of rows) {
+    const oldUrl = String(row.url || "");
+    if (oldUrl.startsWith("/images/pending/")) {
+      const fileName = path.basename(oldUrl);
+      const newUrl = `/images/fossiles/${targetFolder}/${fileName}`;
+      const oldAbs = diskPathFromPublicUrl(oldUrl);
+      const newAbs = diskPathFromPublicUrl(newUrl);
+      if (oldAbs && newAbs && fs.existsSync(oldAbs)) {
+        fs.mkdirSync(path.dirname(newAbs), { recursive: true });
+        fs.renameSync(oldAbs, newAbs);
+      }
+      await pool
+        .request()
+        .input("id", row.id)
+        .input("new_url", newUrl)
+        .query(`
+          UPDATE MULTIMEDIA
+          SET url = @new_url
+          WHERE id = @id
+            AND deleted_at IS NULL
+        `);
+      continue;
+    }
+
+    if (oldUrl.startsWith("/videos/pending/")) {
+      const fileName = path.basename(oldUrl);
+      const newUrl = `/videos/fossiles/${fileName}`;
+      const oldAbs = diskPathFromPublicUrl(oldUrl);
+      const newAbs = diskPathFromPublicUrl(newUrl);
+      if (oldAbs && newAbs && fs.existsSync(oldAbs)) {
+        fs.mkdirSync(path.dirname(newAbs), { recursive: true });
+        fs.renameSync(oldAbs, newAbs);
+      }
+      await pool
+        .request()
+        .input("id", row.id)
+        .input("new_url", newUrl)
+        .query(`
+          UPDATE MULTIMEDIA
+          SET url = @new_url
+          WHERE id = @id
+            AND deleted_at IS NULL
+        `);
+    }
+  }
+}
+
 const aprobarFosil = async (id, adminId) => {
   const before = await pool.request().input("id", id).query(`
-    SELECT TOP 1 id, nombre
+    SELECT TOP 1
+      id, nombre, latitud, longitud,
+      descripcion_general, nombre_comun, nombre_cientifico, contexto_geologico, descripcion_detallada,
+      cantera_sitio, zona_utm, abrasion, fractura, completitud
     FROM FOSIL
     WHERE id = @id
   `);
+  const row = before.recordset?.[0];
+  if (!row) {
+    const err = new Error("Fósil no encontrado");
+    err.statusCode = 404;
+    throw err;
+  }
+  if (row.latitud == null || row.longitud == null) {
+    const err = new Error("No se puede publicar sin coordenadas (latitud y longitud).");
+    err.statusCode = 400;
+    throw err;
+  }
+  const mmCount = await pool.request().input("id", id).query(`
+    SELECT COUNT(1) AS total
+    FROM MULTIMEDIA
+    WHERE fosil_id = @id
+      AND deleted_at IS NULL
+      AND tipo = 'imagen'
+  `);
+  const totalImagenes = Number(mmCount.recordset?.[0]?.total || 0);
+  if (totalImagenes < 1) {
+    const err = new Error("No se puede publicar sin al menos una imagen del hallazgo.");
+    err.statusCode = 400;
+    throw err;
+  }
+  const incompleto =
+    !String(row.descripcion_general || "").trim() ||
+    !String(row.nombre_comun || "").trim() ||
+    !String(row.nombre_cientifico || "").trim() ||
+    !String(row.contexto_geologico || "").trim() ||
+    !String(row.descripcion_detallada || "").trim();
+  if (incompleto) {
+    const err = new Error(
+      "No se puede publicar: faltan resumen, nombre común/científico, contexto geológico o descripción detallada.",
+    );
+    err.statusCode = 400;
+    throw err;
+  }
+  // Si faltan datos curatoriales, completamos "No aplica" para no bloquear el flujo.
+  const cantera = String(row.cantera_sitio || "").trim() || "No aplica";
+  const zonaUtm = String(row.zona_utm || "").trim() || "No aplica";
+  const abrasion = String(row.abrasion || "").trim() || "No aplica";
+  const fractura = String(row.fractura || "").trim() || "No aplica";
+  const completitud = String(row.completitud || "").trim() || "No aplica";
+  await pool
+    .request()
+    .input("id", id)
+    .input("cantera_sitio", cantera)
+    .input("zona_utm", zonaUtm)
+    .input("abrasion", abrasion)
+    .input("fractura", fractura)
+    .input("completitud", completitud)
+    .query(`
+      UPDATE FOSIL
+      SET
+        cantera_sitio = @cantera_sitio,
+        zona_utm = @zona_utm,
+        abrasion = @abrasion,
+        fractura = @fractura,
+        completitud = @completitud,
+        updated_at = GETDATE()
+      WHERE id = @id
+    `);
+  // Flujo requerido: pending -> carpeta final por categoría al aprobar.
+  await moverMultimediaDePendingAFinal(id);
   await pool
     .request()
     .input("fosil_id", id)
@@ -78,7 +226,7 @@ const aprobarFosil = async (id, adminId) => {
     .input("admin_id", adminId)
     .input("notas", null)
     .execute("sp_cambiar_estado_fosil");
-  const nombre = before.recordset?.[0]?.nombre || `Fósil #${id}`;
+  const nombre = row.nombre || `Fósil #${id}`;
   await suscriptoresService.notificarActivos({
     tipo: "fosil_publicado",
     titulo: `Nuevo fósil publicado: ${nombre}`,

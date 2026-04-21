@@ -19,7 +19,7 @@ const obtenerFosilExplorador = async (fosilId) => {
     .request()
     .input("id", fosilId)
     .query(`
-      SELECT id, explorador_id, estado
+      SELECT id, explorador_id, estado, categoria_id
       FROM FOSIL
       WHERE id = @id AND deleted_at IS NULL
     `);

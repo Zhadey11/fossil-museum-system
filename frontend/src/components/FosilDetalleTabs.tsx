@@ -32,13 +32,17 @@ function val(v: unknown): string {
   return String(v);
 }
 
+function taxVal(v: unknown): string {
+  if (v == null || String(v).trim() === "") return "Pendiente de clasificación";
+  return String(v);
+}
+
 export function FosilDetalleTabs({ fosilId, media }: Props) {
   const [activeTab, setActiveTab] = useState<TabId>("galeria");
   const [detalle, setDetalle] = useState<Record<string, unknown> | null>(null);
   const [estudios, setEstudios] = useState<EstudioFosilRow[] | null>(null);
   const [activeImageIdx, setActiveImageIdx] = useState<number | null>(null);
-  const roles = getStoredUser()?.roles || [];
-  const canSeeScientific = roles.includes(1) || roles.includes(2);
+  const [canSeeScientific, setCanSeeScientific] = useState(false);
   const images = useMemo(() => {
     const subOrder: Record<string, number> = {
       antes: 0,
@@ -57,6 +61,11 @@ export function FosilDetalleTabs({ fosilId, media }: Props) {
           (subOrder[a.subtipo || ""] ?? 99) - (subOrder[b.subtipo || ""] ?? 99) || (a.orden ?? 0) - (b.orden ?? 0),
       );
   }, [media]);
+
+  useEffect(() => {
+    const roles = getStoredUser()?.roles || [];
+    setCanSeeScientific(roles.includes(1) || roles.includes(2));
+  }, []);
 
   useEffect(() => {
     if (!canSeeScientific) {
@@ -183,24 +192,37 @@ export function FosilDetalleTabs({ fosilId, media }: Props) {
       {activeTab === "taxonomia" ? (
         <div className="fossil-tab-panel">
           {canSeeScientific && detalle ? (
-            <table className="fossil-taxo-table">
-              <tbody>
-                {[
-                  ["Reino", val(detalle.reino)],
-                  ["Filo", val(detalle.filo)],
-                  ["Clase", val(detalle.clase)],
-                  ["Orden", val(detalle.orden)],
-                  ["Familia", val(detalle.familia)],
-                  ["Género", val(detalle.genero)],
-                  ["Especie", val(detalle.especie)],
-                ].map(([k, v]) => (
-                  <tr key={k}>
-                    <th>{k}</th>
-                    <td>{v}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <>
+              {!detalle.reino &&
+              !detalle.filo &&
+              !detalle.clase &&
+              !detalle.orden &&
+              !detalle.familia &&
+              !detalle.genero &&
+              !detalle.especie ? (
+                <p className="sec-body" style={{ marginBottom: "0.65rem" }}>
+                  Taxonomía aún no cargada para este registro (también aplica a fósiles antiguos).
+                </p>
+              ) : null}
+              <table className="fossil-taxo-table">
+                <tbody>
+                  {[
+                    ["Reino", taxVal(detalle.reino)],
+                    ["Filo", taxVal(detalle.filo)],
+                    ["Clase", taxVal(detalle.clase)],
+                    ["Orden", taxVal(detalle.orden)],
+                    ["Familia", taxVal(detalle.familia)],
+                    ["Género", taxVal(detalle.genero)],
+                    ["Especie", taxVal(detalle.especie)],
+                  ].map(([k, v]) => (
+                    <tr key={k}>
+                      <th>{k}</th>
+                      <td>{v}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
           ) : (
             <p className="sec-body">Taxonomía disponible para perfiles de investigación.</p>
           )}

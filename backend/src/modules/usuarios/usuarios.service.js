@@ -2,7 +2,10 @@ const bcrypt = require("bcrypt");
 const { pool } = require("../../config/db");
 
 async function upsertRolesUsuario(usuarioId, roles = []) {
-  const uniqueRoles = [...new Set((roles || []).map((r) => parseInt(r, 10)).filter(Boolean))];
+  // Rol "publico" (id 4) es acceso anónimo, no asignable a cuentas de usuario.
+  let uniqueRoles = [...new Set((roles || []).map((r) => parseInt(r, 10)).filter(Boolean))]
+    .filter((id) => id !== 4);
+  if (uniqueRoles.length === 0) uniqueRoles = [2];
   const tx = pool.transaction();
   await tx.begin();
   try {
@@ -66,7 +69,7 @@ const obtenerUsuarios = async (query) => {
           SELECT ur.rol_id AS id, r.nombre
           FROM USUARIO_ROL ur
           INNER JOIN ROL r ON r.id = ur.rol_id
-          WHERE ur.usuario_id = u.id AND ur.activo = 1
+          WHERE ur.usuario_id = u.id AND ur.activo = 1 AND r.nombre <> 'publico'
           FOR JSON PATH
         ) AS roles_json
       FROM USUARIO u
@@ -97,7 +100,7 @@ const obtenerUsuariosEliminados = async () => {
         SELECT ur.rol_id AS id, r.nombre
         FROM USUARIO_ROL ur
         INNER JOIN ROL r ON r.id = ur.rol_id
-        WHERE ur.usuario_id = u.id
+        WHERE ur.usuario_id = u.id AND r.nombre <> 'publico'
         FOR JSON PATH
       ) AS roles_json
     FROM USUARIO u
@@ -115,9 +118,13 @@ const crearUsuario = async (data) => {
     }
     const password_hash = await bcrypt.hash(plain, 10);
 
-    const roleIds = Array.isArray(data.roles) && data.roles.length > 0
+    const roleIdsRaw = Array.isArray(data.roles) && data.roles.length > 0
       ? data.roles
       : [data.rol_id || 2];
+    const roleIds = roleIdsRaw
+      .map((r) => parseInt(r, 10))
+      .filter(Boolean)
+      .filter((id) => id !== 4);
     const rolId = parseInt(roleIds[0], 10) || 2;
 
     const result = await pool
@@ -168,7 +175,7 @@ const obtenerUsuarioPorId = async (id) => {
             SELECT ur.rol_id AS id, r.nombre
             FROM USUARIO_ROL ur
             INNER JOIN ROL r ON r.id = ur.rol_id
-            WHERE ur.usuario_id = u.id AND ur.activo = 1
+            WHERE ur.usuario_id = u.id AND ur.activo = 1 AND r.nombre <> 'publico'
             FOR JSON PATH
           ) AS roles_json
         FROM USUARIO u
@@ -265,6 +272,7 @@ const obtenerRoles = async () => {
     SELECT id, nombre, descripcion
     FROM ROL
     WHERE activo = 1
+      AND nombre <> 'publico'
     ORDER BY id ASC
   `);
   return result.recordset;

@@ -37,12 +37,24 @@ export function ExploradorNuevoFosil({ onCreated, onQueueUpdated }: Props) {
   const [altitud, setAltitud] = useState("");
   const [descripcionUbicacion, setDescripcionUbicacion] = useState("");
   const [fechaHallazgo, setFechaHallazgo] = useState("");
+  const [resumenMapa, setResumenMapa] = useState("");
+  const [nombreComun, setNombreComun] = useState("");
+  const [nombreCientifico, setNombreCientifico] = useState("");
+  const [contextoGeologico, setContextoGeologico] = useState("");
+  const [descripcionDetallada, setDescripcionDetallada] = useState("");
+  const [taxNoAplica, setTaxNoAplica] = useState(true);
+  const [taxReino, setTaxReino] = useState("");
+  const [taxFilo, setTaxFilo] = useState("");
+  const [taxClase, setTaxClase] = useState("");
+  const [taxOrden, setTaxOrden] = useState("");
+  const [taxFamilia, setTaxFamilia] = useState("");
+  const [taxGenero, setTaxGenero] = useState("");
+  const [taxEspecie, setTaxEspecie] = useState("");
   const [noAplica, setNoAplica] = useState({
     latitud: false,
     longitud: false,
     altitud: false,
     descripcion: false,
-    fecha: false,
   });
   const [submitTried, setSubmitTried] = useState(false);
   const [geoBusy, setGeoBusy] = useState(false);
@@ -52,11 +64,10 @@ export function ExploradorNuevoFosil({ onCreated, onQueueUpdated }: Props) {
   const lngMissing = !noAplica.longitud && longitud.trim().length === 0;
   const altMissing = !noAplica.altitud && altitud.trim().length === 0;
   const descMissing = !noAplica.descripcion && descripcionUbicacion.trim().length === 0;
-  const fechaMissing = !noAplica.fecha && fechaHallazgo.trim().length === 0;
+  const fechaMissing = fechaHallazgo.trim().length === 0;
   const fechaInvalid =
-    !noAplica.fecha &&
     fechaHallazgo.trim().length > 0 &&
-    toIsoDateFromDigits(fechaHallazgo) == null;
+    toIsoDateFromInput(fechaHallazgo) == null;
   const latInvalid = !noAplica.latitud && latitud.trim().length > 0 && parseNum(latitud) == null;
   const lngInvalid = !noAplica.longitud && longitud.trim().length > 0 && parseNum(longitud) == null;
   const altInvalid = !noAplica.altitud && altitud.trim().length > 0 && parseNum(altitud) == null;
@@ -86,7 +97,20 @@ export function ExploradorNuevoFosil({ onCreated, onQueueUpdated }: Props) {
     lngMissing ||
     altMissing ||
     descMissing ||
-    fechaMissing;
+    fechaMissing ||
+    resumenMapa.trim().length < 12 ||
+    nombreComun.trim().length < 3 ||
+    nombreCientifico.trim().length < 3 ||
+    contextoGeologico.trim().length < 12 ||
+    descripcionDetallada.trim().length < 20 ||
+    (!taxNoAplica &&
+      (taxReino.trim().length < 2 ||
+        taxFilo.trim().length < 2 ||
+        taxClase.trim().length < 2 ||
+        taxOrden.trim().length < 2 ||
+        taxFamilia.trim().length < 2 ||
+        taxGenero.trim().length < 2 ||
+        taxEspecie.trim().length < 2));
 
   useEffect(() => {
     fetchCatalogosFosilForm()
@@ -133,16 +157,17 @@ export function ExploradorNuevoFosil({ onCreated, onQueueUpdated }: Props) {
     return Number.isFinite(n) ? n : null;
   }
 
-  function toIsoDateFromDigits(value: string): string | null {
-    const digits = value.replace(/\D/g, "");
-    if (digits.length !== 8) return null;
-    const y = Number(digits.slice(0, 4));
-    const m = Number(digits.slice(4, 6));
-    const d = Number(digits.slice(6, 8));
+  function toIsoDateFromInput(value: string): string | null {
+    const v = value.trim();
+    const normalized = /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : "";
+    if (!normalized) return null;
+    const y = Number(normalized.slice(0, 4));
+    const m = Number(normalized.slice(5, 7));
+    const d = Number(normalized.slice(8, 10));
     if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return null;
     if (m < 1 || m > 12) return null;
     if (d < 1 || d > 31) return null;
-    return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6, 8)}`;
+    return normalized;
   }
 
   function queueOffline(payload: {
@@ -165,7 +190,7 @@ export function ExploradorNuevoFosil({ onCreated, onQueueUpdated }: Props) {
   }
 
   function toggleNoAplicaField(
-    field: "latitud" | "longitud" | "altitud" | "descripcion" | "fecha",
+    field: "latitud" | "longitud" | "altitud" | "descripcion",
   ) {
     setNoAplica((prev) => {
       const next = !prev[field];
@@ -174,7 +199,6 @@ export function ExploradorNuevoFosil({ onCreated, onQueueUpdated }: Props) {
         if (field === "longitud") setLongitud("");
         if (field === "altitud") setAltitud("");
         if (field === "descripcion") setDescripcionUbicacion("");
-        if (field === "fecha") setFechaHallazgo("");
       }
       return { ...prev, [field]: next };
     });
@@ -298,6 +322,34 @@ export function ExploradorNuevoFosil({ onCreated, onQueueUpdated }: Props) {
       if (typeof window !== "undefined") window.alert(msg);
       return;
     }
+    if (
+      resumenMapa.trim().length < 12 ||
+      nombreComun.trim().length < 3 ||
+      nombreCientifico.trim().length < 3 ||
+      contextoGeologico.trim().length < 12 ||
+      descripcionDetallada.trim().length < 20
+    ) {
+      const msg =
+        "Completá el resumen, nombre común/científico, contexto geológico y descripción detallada para revisión.";
+      setFormErr(msg);
+      if (typeof window !== "undefined") window.alert(msg);
+      return;
+    }
+    if (
+      !taxNoAplica &&
+      (taxReino.trim().length < 2 ||
+        taxFilo.trim().length < 2 ||
+        taxClase.trim().length < 2 ||
+        taxOrden.trim().length < 2 ||
+        taxFamilia.trim().length < 2 ||
+        taxGenero.trim().length < 2 ||
+        taxEspecie.trim().length < 2)
+    ) {
+      const msg = "Completá la taxonomía o marcá No aplica.";
+      setFormErr(msg);
+      if (typeof window !== "undefined") window.alert(msg);
+      return;
+    }
     if (latInvalid || lngInvalid || altInvalid) {
       const msg = "Latitud, longitud y altitud deben ser números válidos o marcarse como \"No aplica\".";
       setFormErr(msg);
@@ -305,7 +357,7 @@ export function ExploradorNuevoFosil({ onCreated, onQueueUpdated }: Props) {
       return;
     }
     if (fechaInvalid) {
-      const msg = "La fecha de hallazgo debe tener 8 números en formato AAAAMMDD.";
+      const msg = "La fecha de hallazgo debe ser válida.";
       setFormErr(msg);
       if (typeof window !== "undefined") window.alert(msg);
       return;
@@ -327,7 +379,19 @@ export function ExploradorNuevoFosil({ onCreated, onQueueUpdated }: Props) {
       longitud: noAplica.longitud ? null : parseNum(longitud),
       altitud_msnm: noAplica.altitud ? null : parseNum(altitud),
       descripcion_ubicacion: noAplica.descripcion ? "No aplica" : descripcionUbicacion.trim(),
-      fecha_hallazgo: noAplica.fecha ? undefined : toIsoDateFromDigits(fechaHallazgo) || undefined,
+      fecha_hallazgo: toIsoDateFromInput(fechaHallazgo) || undefined,
+      descripcion_general: resumenMapa.trim(),
+      nombre_comun: nombreComun.trim(),
+      nombre_cientifico: nombreCientifico.trim(),
+      contexto_geologico: contextoGeologico.trim(),
+      descripcion_detallada: descripcionDetallada.trim(),
+      reino: taxNoAplica ? "No aplica" : taxReino.trim(),
+      filo: taxNoAplica ? "No aplica" : taxFilo.trim(),
+      clase: taxNoAplica ? "No aplica" : taxClase.trim(),
+      orden: taxNoAplica ? "No aplica" : taxOrden.trim(),
+      familia: taxNoAplica ? "No aplica" : taxFamilia.trim(),
+      genero: taxNoAplica ? "No aplica" : taxGenero.trim(),
+      especie: taxNoAplica ? "No aplica" : taxEspecie.trim(),
     };
     try {
       const res = await postCrearFosil(payload);
@@ -353,12 +417,24 @@ export function ExploradorNuevoFosil({ onCreated, onQueueUpdated }: Props) {
       setAltitud("");
       setDescripcionUbicacion("");
       setFechaHallazgo("");
+      setResumenMapa("");
+      setNombreComun("");
+      setNombreCientifico("");
+      setContextoGeologico("");
+      setDescripcionDetallada("");
+      setTaxNoAplica(true);
+      setTaxReino("");
+      setTaxFilo("");
+      setTaxClase("");
+      setTaxOrden("");
+      setTaxFamilia("");
+      setTaxGenero("");
+      setTaxEspecie("");
       setNoAplica({
         latitud: false,
         longitud: false,
         altitud: false,
         descripcion: false,
-        fecha: false,
       });
       setSubmitTried(false);
       onCreated();
@@ -455,6 +531,114 @@ export function ExploradorNuevoFosil({ onCreated, onQueueUpdated }: Props) {
           {nombreShort ? (
             <p className="text-xs text-[salmon]">Usá al menos 4 caracteres para identificar el hallazgo.</p>
           ) : null}
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="flex items-center justify-between gap-3 rounded-sm border px-3 py-2.5 sm:col-span-2" style={inputStyle}>
+            <span className="text-sm text-[var(--bonedim)]">Taxonomía</span>
+            <label className="text-sm text-[var(--bonedim)]">
+              <input
+                type="checkbox"
+                checked={taxNoAplica}
+                onChange={(e) => setTaxNoAplica(e.target.checked)}
+                style={{ marginRight: "0.4rem" }}
+              />
+              No aplica
+            </label>
+          </div>
+          {!taxNoAplica
+            ? [
+                { label: "Reino", value: taxReino, setter: setTaxReino },
+                { label: "Filo", value: taxFilo, setter: setTaxFilo },
+                { label: "Clase", value: taxClase, setter: setTaxClase },
+                { label: "Orden", value: taxOrden, setter: setTaxOrden },
+                { label: "Familia", value: taxFamilia, setter: setTaxFamilia },
+                { label: "Género", value: taxGenero, setter: setTaxGenero },
+                { label: "Especie", value: taxEspecie, setter: setTaxEspecie },
+              ].map(({ label, value, setter }) => (
+                <div key={label} className="flex flex-col gap-2 text-left">
+                  <label className="text-sm text-[var(--bonedim)]">
+                    {label}
+                    {submitTried && String(value).trim().length < 2 ? <span style={{ color: "salmon" }}> *</span> : null}
+                  </label>
+                  <input
+                    value={String(value)}
+                    onChange={(e) => (setter as (v: string) => void)(e.target.value)}
+                    placeholder={String(label)}
+                    className={inputClass}
+                    style={submitTried && String(value).trim().length < 2 ? { ...inputStyle, borderColor: "salmon" } : inputStyle}
+                  />
+                </div>
+              ))
+            : null}
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="flex flex-col gap-2 text-left sm:col-span-2">
+            <label className="text-sm text-[var(--bonedim)]">
+              Resumen (catálogo)
+              {submitTried && resumenMapa.trim().length < 12 ? <span style={{ color: "salmon" }}> *</span> : null}
+            </label>
+            <textarea
+              value={resumenMapa}
+              onChange={(e) => setResumenMapa(e.target.value)}
+              placeholder="Resumen breve para el catálogo público."
+              className={inputClass}
+              style={submitTried && resumenMapa.trim().length < 12 ? { ...inputStyle, borderColor: "salmon", minHeight: "5rem" } : { ...inputStyle, minHeight: "5rem" }}
+            />
+          </div>
+          <div className="flex flex-col gap-2 text-left">
+            <label className="text-sm text-[var(--bonedim)]">
+              Nombre común
+              {submitTried && nombreComun.trim().length < 3 ? <span style={{ color: "salmon" }}> *</span> : null}
+            </label>
+            <input
+              value={nombreComun}
+              onChange={(e) => setNombreComun(e.target.value)}
+              placeholder="Ej. Amonite"
+              className={inputClass}
+              style={submitTried && nombreComun.trim().length < 3 ? { ...inputStyle, borderColor: "salmon" } : inputStyle}
+            />
+          </div>
+          <div className="flex flex-col gap-2 text-left">
+            <label className="text-sm text-[var(--bonedim)]">
+              Nombre científico
+              {submitTried && nombreCientifico.trim().length < 3 ? <span style={{ color: "salmon" }}> *</span> : null}
+            </label>
+            <input
+              value={nombreCientifico}
+              onChange={(e) => setNombreCientifico(e.target.value)}
+              placeholder="Ej. Ammonoidea sp."
+              className={inputClass}
+              style={submitTried && nombreCientifico.trim().length < 3 ? { ...inputStyle, borderColor: "salmon" } : inputStyle}
+            />
+          </div>
+          <div className="flex flex-col gap-2 text-left">
+            <label className="text-sm text-[var(--bonedim)]">
+              Contexto geológico
+              {submitTried && contextoGeologico.trim().length < 12 ? <span style={{ color: "salmon" }}> *</span> : null}
+            </label>
+            <textarea
+              value={contextoGeologico}
+              onChange={(e) => setContextoGeologico(e.target.value)}
+              placeholder="Ambiente geológico del hallazgo."
+              className={inputClass}
+              style={submitTried && contextoGeologico.trim().length < 12 ? { ...inputStyle, borderColor: "salmon", minHeight: "4.5rem" } : { ...inputStyle, minHeight: "4.5rem" }}
+            />
+          </div>
+          <div className="flex flex-col gap-2 text-left">
+            <label className="text-sm text-[var(--bonedim)]">
+              Descripción detallada
+              {submitTried && descripcionDetallada.trim().length < 20 ? <span style={{ color: "salmon" }}> *</span> : null}
+            </label>
+            <textarea
+              value={descripcionDetallada}
+              onChange={(e) => setDescripcionDetallada(e.target.value)}
+              placeholder="Descripción ampliada para revisión del admin."
+              className={inputClass}
+              style={submitTried && descripcionDetallada.trim().length < 20 ? { ...inputStyle, borderColor: "salmon", minHeight: "4.5rem" } : { ...inputStyle, minHeight: "4.5rem" }}
+            />
+          </div>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
@@ -600,23 +784,17 @@ export function ExploradorNuevoFosil({ onCreated, onQueueUpdated }: Props) {
             </div>
             <div className="flex flex-col gap-1">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-xs text-[var(--bonedim)]">Fecha de hallazgo (AAAAMMDD)</span>
+                <span className="text-xs text-[var(--bonedim)]">Fecha de hallazgo</span>
                 {submitTried && fechaMissing ? <span style={{ color: "salmon" }}> *</span> : null}
-                <button type="button" className="text-xs underline" onClick={() => toggleNoAplicaField("fecha")}>
-                  {noAplica.fecha ? "Quitar No aplica" : "No aplica"}
-                </button>
               </div>
               <input
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
+                type="date"
                 value={fechaHallazgo}
-                onChange={(e) => setFechaHallazgo(e.target.value.replace(/\D/g, "").slice(0, 8))}
-                placeholder="AAAAMMDD"
+                onChange={(e) => setFechaHallazgo(e.target.value)}
                 className={inputClass}
                 style={submitTried && (fechaMissing || fechaInvalid) ? { ...inputStyle, borderColor: "salmon" } : inputStyle}
-                disabled={noAplica.fecha}
               />
+              <p className="text-xs text-[var(--bonedim)]/80">Seleccioná la fecha desde el calendario.</p>
             </div>
           </div>
         </div>

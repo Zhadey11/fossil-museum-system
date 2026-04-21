@@ -99,7 +99,9 @@ export function FosilMultimediaBlock({ fosilId, modoRevision = false }: Props) {
   const visibles =
     items?.filter((m) => {
       const t = tipoNorm(m.tipo);
-      if (t === "imagen" || t === "video") return true;
+      if (t === "video" || urlLooksVideo(m.url)) return true;
+      // Acepta variantes legacy en BD (foto/image/imagen/etc.) y fallback por extensión URL.
+      if (t !== "video" && (urlLooksImage(m.url) || t.length > 0)) return true;
       if (!t && (urlLooksImage(m.url) || urlLooksVideo(m.url))) return true;
       return false;
     }) ?? [];
@@ -115,7 +117,7 @@ export function FosilMultimediaBlock({ fosilId, modoRevision = false }: Props) {
         </p>
       ) : null}
 
-      {modoRevision ? (
+      {modoRevision && visibles.length === 0 ? (
         <p className="mb-2 text-sm" style={{ color: "var(--bone)", lineHeight: 1.45 }}>
           <strong>Material del hallazgo:</strong> revisá estas fotos o videos antes de publicar o
           rechazar. Si no ves nada, el explorador pudo dar de alta el registro sin imagen o falló la

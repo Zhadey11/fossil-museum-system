@@ -297,7 +297,12 @@ export async function fetchAdminSuscriptoresHistorial(): Promise<SuscriptorHisto
 async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const url = apiUrl(path);
   const headers = new Headers(init.headers);
-  return fetch(url, { ...init, headers, credentials: "include" });
+  return fetch(url, {
+    ...init,
+    headers,
+    credentials: "include",
+    cache: init.cache ?? "no-store",
+  });
 }
 
 export async function fetchMisRegistros(): Promise<ApiFosilRow[]> {
@@ -377,6 +382,18 @@ export async function postCrearFosil(body: {
   altitud_msnm?: number | null;
   descripcion_ubicacion?: string;
   fecha_hallazgo?: string;
+  descripcion_general?: string;
+  nombre_comun?: string;
+  nombre_cientifico?: string;
+  contexto_geologico?: string;
+  descripcion_detallada?: string;
+  reino?: string;
+  filo?: string;
+  clase?: string;
+  orden?: string;
+  familia?: string;
+  genero?: string;
+  especie?: string;
 }): Promise<{ mensaje: string; data: { id: number } }> {
   const res = await apiFetch("/api/fosiles", {
     method: "POST",
@@ -1026,7 +1043,8 @@ export async function uploadMultimediaFosil(
   if (Array.isArray(file)) {
     for (const f of file) formData.append("files", f);
   } else {
-    formData.append("file", file);
+    // Unificamos al campo "files" para evitar rechazos por nombre de campo inesperado.
+    formData.append("files", file);
   }
   formData.append("fosil_id", String(fosilId));
   if (opts?.subtipo) formData.append("subtipo", opts.subtipo);
