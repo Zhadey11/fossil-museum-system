@@ -31,6 +31,8 @@ paths:
   /api/fosiles:
     get:
       summary: Listar fósiles públicos
+      description: |
+        Devuelve información pública del catálogo. No expone coordenadas GPS ni código único.
       parameters:
         - in: query
           name: q
@@ -55,6 +57,22 @@ paths:
           schema: { type: integer }
       responses:
         "200": { description: Lista de fósiles }
+  /api/fosiles/publico/mapa:
+    get:
+      summary: Puntos para mapa público (fósiles publicados)
+      description: |
+        Devuelve solo los campos mínimos para renderizar el mapa público:
+        id, slug, nombre, latitud, longitud, categoría, portada y jerarquía
+        geográfica (cantón, provincia, país) cuando existan en BD.
+      responses:
+        "200":
+          description: Lista de puntos del mapa público
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PublicMapPoint"
     post:
       summary: Crear fósil
       security:
@@ -412,6 +430,20 @@ paths:
       responses:
         "200": { description: Archivos subidos }
 components:
+  schemas:
+    PublicMapPoint:
+      type: object
+      properties:
+        id: { type: integer }
+        slug: { type: string, nullable: true }
+        nombre: { type: string }
+        latitud: { type: number }
+        longitud: { type: number }
+        categoria_codigo: { type: string, nullable: true }
+        portada_url: { type: string, nullable: true }
+        canton_nombre: { type: string, nullable: true }
+        provincia_nombre: { type: string, nullable: true }
+        pais_nombre: { type: string, nullable: true }
   securitySchemes:
     bearerAuth:
       type: http

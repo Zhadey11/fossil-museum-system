@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const { pool } = require("../../config/db");
+const { diskPathFromPublicUrl } = require("../../config/paths");
 
 const SUBTIPOS_VALIDOS = new Set([
   "antes",
@@ -33,7 +34,7 @@ const assertAccesoFosil = async (user, fosilId) => {
     err.statusCode = 404;
     throw err;
   }
-  const roles = user.roles || [];
+  const roles = (user.roles || []).map((r) => Number(r));
   if (roles.includes(1)) return fosil;
   if (roles.includes(3) && fosil.explorador_id === user.id) return fosil;
   const err = new Error("No autorizado");
@@ -108,7 +109,11 @@ const obtenerCatalogoPublicoImagenes = async (query) => {
     request.input("categoria_id", parseInt(query.categoria_id, 10));
   }
   if (query.q) {
-    whereSql += " AND (f.nombre LIKE @q OR f.descripcion_general LIKE @q OR f.codigo_unico LIKE @q OR m.url LIKE @q)";
+    whereSql += ` AND (
+      f.nombre LIKE @q OR f.descripcion_general LIKE @q OR f.codigo_unico LIKE @q OR m.url LIKE @q
+      OR (f.nombre_comun IS NOT NULL AND f.nombre_comun LIKE @q)
+      OR (f.nombre_cientifico IS NOT NULL AND f.nombre_cientifico LIKE @q)
+    )`;
     request.input("q", `%${String(query.q).trim()}%`);
   }
   if (query.ubicacion) {
@@ -134,22 +139,35 @@ const obtenerCatalogoPublicoImagenes = async (query) => {
     SELECT
       m.id AS multimedia_id,
       m.url AS imagen_url,
+      m.nombre_archivo,
       m.subtipo,
       m.descripcion AS imagen_descripcion,
       f.id,
       f.nombre,
+      f.nombre_comun,
+      f.nombre_cientifico,
       f.codigo_unico,
       f.descripcion_general,
       f.categoria_id,
       cf.codigo AS categoria_codigo,
       cf.nombre AS categoria_nombre,
       eg.nombre AS era_nombre,
-      pg.nombre AS periodo_nombre
+      pg.nombre AS periodo_nombre,
+      COALESCE(
+        NULLIF(LTRIM(RTRIM(CONCAT(prov.nombre, N', ', pa.nombre))), N''),
+        NULLIF(LTRIM(RTRIM(CONCAT_WS(N' · ', prov.nombre, cant.nombre))), N''),
+        f.descripcion_ubicacion
+      ) AS ubicacion,
+      NULLIF(LTRIM(RTRIM(CONCAT(ex.nombre, N' ', ex.apellido))), N'') AS explorador_publico
     FROM MULTIMEDIA m
     INNER JOIN FOSIL f ON f.id = m.fosil_id
     LEFT JOIN CATEGORIA_FOSIL cf ON cf.id = f.categoria_id
     LEFT JOIN ERA_GEOLOGICA eg ON eg.id = f.era_id
     LEFT JOIN PERIODO_GEOLOGICO pg ON pg.id = f.periodo_id
+    LEFT JOIN USUARIO ex ON ex.id = f.explorador_id AND ex.deleted_at IS NULL
+    LEFT JOIN CANTON cant ON cant.id = f.canton_id
+    LEFT JOIN PROVINCIA prov ON prov.id = cant.provincia_id
+    LEFT JOIN PAIS pa ON pa.id = prov.pais_id
     ${whereSql}
     ORDER BY f.created_at DESC, m.es_principal DESC, m.orden ASC, m.id ASC
     OFFSET @offset ROWS FETCH NEXT @fetch_size ROWS ONLY
@@ -254,7 +272,17 @@ const crearMultimedia = async (data) => {
       SELECT CAST(SCOPE_IDENTITY() AS INT) AS id;
     `);
 
-  return result.recordset[0];
+  const lastRs =
+    result.recordsets && result.recordsets.length > 0
+      ? result.recordsets[result.recordsets.length - 1]
+      : result.recordset;
+  const row = lastRs && lastRs[0];
+  if (!row || row.id == null) {
+    const err = new Error("No se pudo registrar multimedia en base de datos");
+    err.statusCode = 500;
+    throw err;
+  }
+  return row;
 };
 
 const eliminarMultimedia = async (id) => {
@@ -280,8 +308,8 @@ function borrarArchivoFisico(urlPath) {
   ) {
     return;
   }
-  const rel = urlPath.replace(/^\//, "");
-  const abs = path.join(process.cwd(), rel);
+  const abs = diskPathFromPublicUrl(urlPath);
+  if (!abs) return;
   fs.unlink(abs, (err) => {
     if (err && err.code !== "ENOENT") {
       console.error("[multimedia] unlink:", abs, err.message);

@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import Image from "next/image";
 import {
   PERIODO_ID_BY_SLUG,
   TIMELINE_BLOCKS,
 } from "@/data/timeline";
 import { fetchCatalogoPublicoImagenes } from "@/lib/api";
 import { catalogImageCardFromApi } from "@/lib/fosilesDisplay";
+import { CatalogImageWithFallback } from "@/components/CatalogImageWithFallback";
 
 type PageProps = {
   searchParams: Promise<{
@@ -92,6 +92,15 @@ export default async function CatalogoPage({ searchParams }: PageProps) {
   const totalItems = apiResult.ok ? apiResult.total : fossils.length;
   const hasPreciseTotal = apiResult.ok && Number.isFinite(apiResult.total) && apiResult.total > 0;
 
+  const hasActiveFilters = Boolean(
+    q ||
+      ubicacion ||
+      categoria ||
+      era ||
+      periodoId ||
+      (sort && sort !== "default"),
+  );
+
   return (
     <div className="sw-page catalog-page-modern" style={{ background: "var(--surface)" }}>
       <section className="catalog-hero-modern">
@@ -175,7 +184,18 @@ export default async function CatalogoPage({ searchParams }: PageProps) {
               <option value="default">Orden predeterminado</option>
               <option value="name_asc">Nombre (A-Z)</option>
             </select>
-            <button type="submit" className="btn-out">Aplicar</button>
+            <button type="submit" className="btn-out">
+              Aplicar
+            </button>
+            {hasActiveFilters ? (
+              <Link
+                href="/catalogo"
+                className="catalog-reset-filters"
+                title="Quitar categoría, era, período, orden y búsqueda"
+              >
+                Reiniciar filtros
+              </Link>
+            ) : null}
           </form>
           <p className="catalog-count">
             {hasPreciseTotal ? `${totalItems} fósiles encontrados` : `Mostrando ${fossils.length} fósiles`}
@@ -192,12 +212,11 @@ export default async function CatalogoPage({ searchParams }: PageProps) {
           fossils.map((fossil) => (
             <article key={fossil.id} className="catalog-fossil-card">
               <div className="catalog-thumb-wrap">
-                <Image
+                <CatalogImageWithFallback
                   src={fossil.imageSrc}
+                  fallback={fossil.fallbackSrc}
                   alt={fossil.name}
                   className="catalog-thumb"
-                  fill
-                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                 />
                 <span className={`catalog-cat-badge ${fossil.categoryBadge}`.trim()}>
                   {fossil.categoryBadge}
@@ -206,13 +225,25 @@ export default async function CatalogoPage({ searchParams }: PageProps) {
               </div>
               <div className="catalog-card-body">
                 <h3 className="catalog-card-title">{fossil.name}</h3>
+                {fossil.scientificName ? (
+                  <p className="catalog-card-scientific">{fossil.scientificName}</p>
+                ) : null}
                 <p className="catalog-card-desc">{fossil.description}</p>
-                <p className="catalog-origin">{fossil.originLabel}</p>
+                {fossil.ubicacion ? (
+                  <p className="catalog-card-meta">
+                    <span className="catalog-meta-label">Ubicación:</span> {fossil.ubicacion}
+                  </p>
+                ) : null}
+                {fossil.encontradoPor ? (
+                  <p className="catalog-card-meta">
+                    <span className="catalog-meta-label">Encontrado por:</span> {fossil.encontradoPor}
+                  </p>
+                ) : null}
               </div>
               <footer className="catalog-card-footer">
                 <span className="catalog-location">{fossil.category}</span>
                 <Link href={fossil.fichaHref || "/catalogo"} className="catalog-detail-link">
-                  Ver detalle
+                  Ver detalle →
                 </Link>
               </footer>
             </article>

@@ -36,6 +36,16 @@ export function categoryLabel(categoria_id?: number): string {
   return CATEGORIA_LABEL[categoria_id] ?? `Categoría ${categoria_id}`;
 }
 
+/** Título corto de catálogo: nombre común explícito, o legado `nombre`. */
+export function tituloPublicoFosil(row: {
+  nombre: string;
+  nombre_comun?: string | null;
+}): string {
+  const c = row.nombre_comun?.trim();
+  if (c) return c;
+  return row.nombre?.trim() || "";
+}
+
 export function placeholderImageForId(id: number): string {
   const i = Math.abs(id) % PLACEHOLDER_IMAGES.length;
   return PLACEHOLDER_IMAGES[i];
@@ -64,20 +74,20 @@ export function fosilCardFromApi(row: ApiFosilRow, index: number) {
     "Colección";
   return {
     id: String(row.id),
-    name: row.nombre,
+    name: tituloPublicoFosil(row),
     category: resolvedCategoryLabel,
     categoryBadge,
     eraLabel: row.era_nombre || "Era no disponible",
     imageSrc: portada ?? placeholderImageForId(row.id + index),
     fallbackSrc: placeholderImageForId(row.id + index),
     description: short,
-    originLabel: "Registro verificado",
     fichaHref: `/fosil/${row.id}`,
   };
 }
 
+/** Catálogo por imagen: nombre común/científico en BD (sin concatenar archivo). */
 export function catalogImageCardFromApi(row: CatalogoImagenRow, index: number) {
-  const desc = row.imagen_descripcion?.trim() || row.descripcion_general?.trim() || "";
+  const desc = row.descripcion_general?.trim() || "";
   const short = desc && desc.length > 160 ? `${desc.slice(0, 157)}…` : desc || undefined;
   const imageSrc =
     typeof row.imagen_url === "string" && row.imagen_url.length > 0
@@ -96,16 +106,23 @@ export function catalogImageCardFromApi(row: CatalogoImagenRow, index: number) {
     (row.categoria_id ? categoryLabel(row.categoria_id) : null) ||
     LABEL_BY_BADGE[categoryBadge] ||
     "Colección";
+  const name = tituloPublicoFosil(row);
+  const scientificName = row.nombre_cientifico?.trim() || undefined;
+  const ubicacion = row.ubicacion?.trim() || undefined;
+  const encontradoPor = row.explorador_publico?.trim() || undefined;
+
   return {
     id: `${row.id}-${row.multimedia_id}`,
-    name: row.nombre,
+    name,
+    scientificName,
+    ubicacion,
+    encontradoPor,
     category: resolvedCategoryLabel,
     categoryBadge,
     eraLabel: row.era_nombre || "Era no disponible",
     imageSrc,
     fallbackSrc: placeholderImageForId(row.id + index),
     description: short,
-    originLabel: "Registro verificado",
     fichaHref: row.id > 0 ? `/fosil/${row.id}` : undefined,
   };
 }

@@ -28,6 +28,7 @@ router.get(
 );
 
 router.get("/", controller.getFosiles);
+router.get("/publico/mapa", controller.getMapaPublico);
 
 router.get(
   "/:id/detalle",

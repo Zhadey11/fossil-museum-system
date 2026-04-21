@@ -2,55 +2,41 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { MapFossilPoint } from "@/data/mapFossils";
 import { MapaFosilesLoader } from "@/components/MapaFosilesLoader";
-import type { ApiFosilRow } from "@/lib/api";
-import { fetchFosilesPublic, multimediaAbsUrl } from "@/lib/api";
+import { fetchMapaPublicoPoints, multimediaAbsUrl } from "@/lib/api";
 
 export const metadata: Metadata = {
   title: "Mapa de hallazgos",
   description: "Explora en el mapa dónde se registraron fósiles publicados.",
 };
 
-function apiRowsToMapPoints(rows: ApiFosilRow[]): MapFossilPoint[] {
-  return rows
-    .filter(
-      (r) =>
-        r.latitud != null &&
-        r.longitud != null &&
-        Number.isFinite(Number(r.latitud)) &&
-        Number.isFinite(Number(r.longitud)),
-    )
-    .map((r) => {
-      const desc = r.descripcion_general?.trim() || "";
-      return {
+export default async function MapaPage() {
+  const points: MapFossilPoint[] = [];
+  const res = await fetchMapaPublicoPoints();
+  if (res.ok) {
+    for (const r of res.data) {
+      const lat = Number(r.latitud);
+      const lng = Number(r.longitud);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+      const canton = (r.canton_nombre || "").trim();
+      const provincia = (r.provincia_nombre || "").trim();
+      const pais = (r.pais_nombre || "Costa Rica").trim() || "Costa Rica";
+      const locLine = [canton, provincia].filter(Boolean).join(" · ");
+      points.push({
         id: String(r.id),
         slug: r.slug || String(r.id),
         nombre: r.nombre,
-        latitud: Number(r.latitud),
-        longitud: Number(r.longitud),
-        pais: "Costa Rica",
-        provincia: "Ver catálogo",
-        resumen: desc.length > 120 ? `${desc.slice(0, 117)}…` : desc,
-        descripcion: desc,
-        thumb: r.portada_url
-          ? multimediaAbsUrl(r.portada_url)
-          : "/images/FondoInicial.jpg",
+        latitud: lat,
+        longitud: lng,
+        pais,
+        provincia: provincia || "—",
+        canton: canton || undefined,
+        resumen: locLine ? `Registro publicado · ${locLine}` : "Registro publicado",
+        descripcion: "Hallazgo disponible en la ficha pública.",
+        thumb: r.portada_url ? multimediaAbsUrl(r.portada_url) : "/images/FondoInicial.jpg",
         categoria: r.categoria_codigo || "FOS",
-      };
-    });
-}
-
-export default async function MapaPage() {
-  const rows: ApiFosilRow[] = [];
-  let page = 1;
-  let hasNext = true;
-  while (hasNext && page <= 20) {
-    const res = await fetchFosilesPublic({ page, page_size: 100 });
-    if (!res.ok) break;
-    rows.push(...res.data);
-    hasNext = res.has_next;
-    page += 1;
+      });
+    }
   }
-  const points = apiRowsToMapPoints(rows);
 
   return (
     <div className="sw-page mapa-page" style={{ background: "var(--surface)" }}>
@@ -60,7 +46,10 @@ export default async function MapaPage() {
           Mapa de <em>hallazgos</em>
         </h1>
         <div className="sec-rule" />
-        <p className="sec-body" style={{ margin: "1rem auto 0", maxWidth: "42rem" }}>Cada pin representa un fósil publicado con coordenadas registradas.</p>
+        <p className="sec-body" style={{ margin: "1rem auto 0", maxWidth: "42rem" }}>
+          Mapa de fósiles publicados. Al aprobar nuevos hallazgos con coordenadas válidas, aparecen
+          automáticamente aquí.
+        </p>
       </section>
 
       <section style={{ padding: "0 clamp(1rem, 4vw, 4rem) 4rem" }}>

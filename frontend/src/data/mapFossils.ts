@@ -8,6 +8,8 @@ export type MapFossilPoint = {
   longitud: number;
   pais: string;
   provincia: string;
+  /** Cantón (Costa Rica) para filtros del mapa */
+  canton?: string;
   /** Texto corto para popup */
   resumen: string;
   /** Texto largo para ficha */
@@ -25,6 +27,7 @@ export const MAP_FOSSIL_POINTS: MapFossilPoint[] = [
     longitud: -83.678,
     pais: "Costa Rica",
     provincia: "Cartago",
+    canton: "Turrialba",
     resumen: "Cretácico marino — lutitas del Valle de Turrialba.",
     descripcion:
       "Diente cónico bien preservado de mosasaurio. Hallado en afloramientos de lutita calcárea del Cretácico Superior.",
@@ -37,6 +40,7 @@ export const MAP_FOSSIL_POINTS: MapFossilPoint[] = [
     longitud: -82.85,
     pais: "Costa Rica",
     provincia: "Limón",
+    canton: "Talamanca",
     resumen: "Eoceno — sedimentos marinos en costa caribeña.",
     descripcion:
       "Vértebra lumbar de cetáceo arqueoceto. Contexto de acantilado costero; bioestratigrafía en revisión. Datos ampliados en la ficha técnica.",
@@ -49,6 +53,7 @@ export const MAP_FOSSIL_POINTS: MapFossilPoint[] = [
     longitud: -84.05,
     pais: "Costa Rica",
     provincia: "San José",
+    canton: "Puriscal",
     resumen: "Cretácico inferior — cueva calcárea en el cáñon.",
     descripcion:
       "Amonita con ornamentación de costillas; sutura analizada en estudio preliminar. Más imágenes y taxonomía en la ficha.",
@@ -61,6 +66,7 @@ export const MAP_FOSSIL_POINTS: MapFossilPoint[] = [
     longitud: -83.92,
     pais: "Costa Rica",
     provincia: "Cartago",
+    canton: "Cartago",
     resumen: "Cámbrico — primer registro documentado en la zona.",
     descripcion:
       "Espécimen completo con mineralización piritica. Fotogrametría y comparación con fauna gondwánica en preparación.",
@@ -73,6 +79,7 @@ export const MAP_FOSSIL_POINTS: MapFossilPoint[] = [
     longitud: -83.74,
     pais: "Costa Rica",
     provincia: "Cartago",
+    canton: "Turrialba",
     resumen: "Jurásico inferior — afloramientos al pie del volcán.",
     descripcion:
       "Colonia de coral tabular con estructura hexagonal. Sección fina y correlación estratigráfica en la ficha extendida.",
@@ -85,6 +92,7 @@ export const MAP_FOSSIL_POINTS: MapFossilPoint[] = [
     longitud: -84.5167,
     pais: "Costa Rica",
     provincia: "Alajuela",
+    canton: "San Carlos",
     resumen: "Jurásico medio — fronde en lutita carbonosa.",
     descripcion:
       "Impresión de fronde arborescente; indicadores paleoclimáticos descritos en el estudio asociado.",
@@ -97,6 +105,7 @@ export const MAP_FOSSIL_POINTS: MapFossilPoint[] = [
     longitud: -89.9022,
     pais: "Guatemala",
     provincia: "Petén",
+    canton: "Flores",
     resumen: "Registro en Guatemala para cobertura regional del mapa.",
     descripcion:
       "Coordenadas de referencia cerca de la región del Petén.",
@@ -109,6 +118,7 @@ export const MAP_FOSSIL_POINTS: MapFossilPoint[] = [
     longitud: -91.1487,
     pais: "Guatemala",
     provincia: "Quiché",
+    canton: "Santa Cruz del Quiché",
     resumen: "Segundo registro en Guatemala.",
     descripcion:
       "Registro georreferenciado para consulta por país y provincia.",
@@ -119,17 +129,11 @@ export function getMapFossilById(id: string): MapFossilPoint | undefined {
   return MAP_FOSSIL_POINTS.find((p) => p.id === id);
 }
 
-export function paisesEnMapa(points: MapFossilPoint[] = MAP_FOSSIL_POINTS): string[] {
-  return [...new Set(points.map((p) => p.pais))].sort();
-}
-
-export function provinciasPorPais(
-  points: MapFossilPoint[],
-  pais: string | null,
-): string[] {
-  if (!pais) return [];
+export function cantonesEnMapa(points: MapFossilPoint[] = MAP_FOSSIL_POINTS): string[] {
   const set = new Set(
-    points.filter((p) => p.pais === pais).map((p) => p.provincia),
+    points
+      .map((p) => (p.canton || p.provincia || "").trim())
+      .filter((s) => s.length > 0),
   );
-  return [...set].sort();
+  return [...set].sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" }));
 }

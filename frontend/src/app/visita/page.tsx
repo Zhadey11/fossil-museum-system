@@ -19,7 +19,7 @@ export default function VisitaPage() {
           <article style={{ border: "1px solid rgba(200,146,42,.3)", padding: "1rem", borderRadius: 10 }}><p className="flex items-center gap-2"><svg viewBox="0 0 24 24" style={iconStyle}><path d="M7 4h10v16H7z" stroke="currentColor" fill="none" /><path d="M10 7h4" stroke="currentColor" /></svg>Contacto</p><p className="sec-body">info@stonewake.org · (506) 2450-1100</p></article>
         </div>
         <div style={{ marginTop: "1rem" }}>
-          <MapaFosilesLoader points={[{ id: "sw", slug: "sw", nombre: "Stonewake Museum", latitud: 9.7, longitud: -83.7, pais: "Costa Rica", provincia: "San José", resumen: "Museo", descripcion: "Museo", categoria: "VIS" }]} />
+          <MapaFosilesLoader points={[{ id: "sw", slug: "sw", nombre: "Stonewake Museum", latitud: 9.7, longitud: -83.7, pais: "Costa Rica", provincia: "San José", canton: "San José", resumen: "Museo", descripcion: "Museo", categoria: "VIS" }]} />
         </div>
       </section>
     </div>

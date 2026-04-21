@@ -2,12 +2,13 @@ const { pool } = require("../../config/db");
 
 const PUBLIC_COLUMNS = `
   f.id,
-  f.codigo_unico,
   f.canton_id,
   f.categoria_id,
   f.era_id,
   f.periodo_id,
   f.nombre,
+  f.nombre_comun,
+  f.nombre_cientifico,
   f.slug,
   cf.codigo AS categoria_codigo,
   cf.nombre AS categoria_nombre,
@@ -18,9 +19,26 @@ const PUBLIC_COLUMNS = `
   f.estado,
   f.fecha_hallazgo,
   f.created_at,
-  f.latitud,
-  f.longitud,
-  CASE WHEN f.latitud IS NOT NULL AND f.longitud IS NOT NULL THEN 1 ELSE 0 END AS tiene_coordenadas
+  ex.nombre AS explorador_nombre,
+  ex.apellido AS explorador_apellido,
+  COALESCE(
+    NULLIF(LTRIM(RTRIM(CONCAT(prov.nombre, N', ', pa.nombre))), N''),
+    NULLIF(LTRIM(RTRIM(CONCAT_WS(N' · ', prov.nombre, cant.nombre))), N''),
+    f.descripcion_ubicacion
+  ) AS ubicacion,
+  f.cantera_sitio,
+  NULLIF(LTRIM(RTRIM(CONCAT(ex.nombre, N' ', ex.apellido))), N'') AS explorador_publico
+`;
+
+const PUBLIC_FROM = `
+    FROM FOSIL f
+    LEFT JOIN CATEGORIA_FOSIL cf ON cf.id = f.categoria_id
+    LEFT JOIN ERA_GEOLOGICA eg ON eg.id = f.era_id
+    LEFT JOIN PERIODO_GEOLOGICO pg ON pg.id = f.periodo_id
+    LEFT JOIN USUARIO ex ON ex.id = f.explorador_id AND ex.deleted_at IS NULL
+    LEFT JOIN CANTON cant ON cant.id = f.canton_id
+    LEFT JOIN PROVINCIA prov ON prov.id = cant.provincia_id
+    LEFT JOIN PAIS pa ON pa.id = prov.pais_id
 `;
 
 const obtenerFosiles = async (query) => {
@@ -36,10 +54,7 @@ const obtenerFosiles = async (query) => {
           AND m.tipo = 'imagen'
         ORDER BY m.es_principal DESC, m.orden ASC, m.id ASC
       ) AS portada_url
-    FROM FOSIL f
-    LEFT JOIN CATEGORIA_FOSIL cf ON cf.id = f.categoria_id
-    LEFT JOIN ERA_GEOLOGICA eg ON eg.id = f.era_id
-    LEFT JOIN PERIODO_GEOLOGICO pg ON pg.id = f.periodo_id
+    ${PUBLIC_FROM}
     WHERE f.deleted_at IS NULL
   `;
 
@@ -67,7 +82,11 @@ const obtenerFosiles = async (query) => {
   }
 
   if (query.q) {
-    sql += ` AND (f.nombre LIKE @q OR f.descripcion_general LIKE @q OR f.codigo_unico LIKE @q)`;
+    sql += ` AND (
+      f.nombre LIKE @q OR f.descripcion_general LIKE @q
+      OR (f.nombre_comun IS NOT NULL AND f.nombre_comun LIKE @q)
+      OR (f.nombre_cientifico IS NOT NULL AND f.nombre_cientifico LIKE @q)
+    )`;
     request.input("q", `%${String(query.q).trim()}%`);
   }
 
@@ -107,10 +126,7 @@ const obtenerFosilPublicoPorId = async (id) => {
             AND m.tipo = 'imagen'
           ORDER BY m.es_principal DESC, m.orden ASC, m.id ASC
         ) AS portada_url
-      FROM FOSIL f
-      LEFT JOIN CATEGORIA_FOSIL cf ON cf.id = f.categoria_id
-      LEFT JOIN ERA_GEOLOGICA eg ON eg.id = f.era_id
-      LEFT JOIN PERIODO_GEOLOGICO pg ON pg.id = f.periodo_id
+      ${PUBLIC_FROM}
       WHERE f.id = @id
         AND f.deleted_at IS NULL
         AND f.estado = 'publicado'
@@ -119,15 +135,63 @@ const obtenerFosilPublicoPorId = async (id) => {
   return result.recordset[0];
 };
 
+const obtenerPuntosMapaPublico = async () => {
+  const result = await pool.request().query(`
+    SELECT
+      f.id,
+      f.slug,
+      f.nombre,
+      f.latitud,
+      f.longitud,
+      cf.codigo AS categoria_codigo,
+      cant.nombre AS canton_nombre,
+      prov.nombre AS provincia_nombre,
+      pa.nombre AS pais_nombre,
+      COALESCE(
+        (
+          SELECT TOP 1 m.url
+          FROM MULTIMEDIA m
+          WHERE m.fosil_id = f.id
+            AND m.deleted_at IS NULL
+            AND m.tipo = 'imagen'
+          ORDER BY m.es_principal DESC, m.orden ASC, m.id ASC
+        ),
+        NULL
+      ) AS portada_url
+    FROM FOSIL f
+    LEFT JOIN CATEGORIA_FOSIL cf ON cf.id = f.categoria_id
+    LEFT JOIN CANTON cant ON cant.id = f.canton_id
+    LEFT JOIN PROVINCIA prov ON prov.id = cant.provincia_id
+    LEFT JOIN PAIS pa ON pa.id = prov.pais_id
+    WHERE f.deleted_at IS NULL
+      AND f.estado = 'publicado'
+      AND f.latitud IS NOT NULL
+      AND f.longitud IS NOT NULL
+    ORDER BY f.created_at DESC, f.id DESC
+  `);
+  return result.recordset || [];
+};
+
 const obtenerDetalleCompleto = async (id) => {
-  const result = await pool
-    .request()
-    .input("id", id)
-    .query(`
-      SELECT *
-      FROM FOSIL
-      WHERE id = @id
-        AND deleted_at IS NULL
+  const result = await pool.request().input("id", id).query(`
+      SELECT
+        f.*,
+        t.reino,
+        t.filo,
+        t.clase,
+        t.orden,
+        t.familia,
+        t.genero,
+        t.especie,
+        CASE
+          WHEN ua.id IS NOT NULL THEN NULLIF(LTRIM(RTRIM(CONCAT(ua.nombre, N' ', ua.apellido))), N'')
+          ELSE NULL
+        END AS investigador_responsable
+      FROM FOSIL f
+      LEFT JOIN TAXONOMIA t ON t.id = f.taxonomia_id
+      LEFT JOIN USUARIO ua ON ua.id = f.administrador_id AND ua.deleted_at IS NULL
+      WHERE f.id = @id
+        AND f.deleted_at IS NULL
     `);
 
   return result.recordset[0];
@@ -173,6 +237,18 @@ const CAMPOS_ADMIN = [
   "era_id",
   "periodo_id",
   "taxonomia_id",
+  "nombre_comun",
+  "nombre_cientifico",
+  "endurecedor",
+  "completitud",
+  "fractura",
+  "meteorizacion",
+  "abrasion",
+  "largo_cm",
+  "ancho_cm",
+  "grosor_cm",
+  "zona_utm",
+  "cantera_sitio",
 ];
 
 const actualizarFosil = async (id, data, ctx) => {
@@ -210,7 +286,10 @@ const actualizarFosil = async (id, data, ctx) => {
     if (
       key === "latitud" ||
       key === "longitud" ||
-      key === "altitud_msnm"
+      key === "altitud_msnm" ||
+      key === "largo_cm" ||
+      key === "ancho_cm" ||
+      key === "grosor_cm"
     ) {
       val = val === null || val === "" ? null : Number(val);
     }
@@ -282,7 +361,11 @@ const crearFosil = async (data, user) => {
       SELECT @nuevo_id AS id, @nuevo_codigo AS codigo_unico;
     `);
 
-  const row = result.recordset?.[0] || {};
+  const lastRs =
+    result.recordsets && result.recordsets.length > 0
+      ? result.recordsets[result.recordsets.length - 1]
+      : result.recordset;
+  const row = lastRs?.[0] || {};
   return { id: row.id, codigo_unico: row.codigo_unico };
 };
 
@@ -368,6 +451,7 @@ const obtenerFosilesParaInvestigador = async (investigadorId, isAdmin) => {
 module.exports = {
   obtenerFosiles,
   obtenerFosilPublicoPorId,
+  obtenerPuntosMapaPublico,
   obtenerDetalleCompleto,
   obtenerFosilesPorExplorador,
   obtenerTodosFosilesGestion,

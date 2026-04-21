@@ -16,8 +16,13 @@ function apiUrl(path: string): string {
 
 export type ApiFosilRow = {
   id: number;
+  /** Campo sensible: solo debe venir en endpoints autenticados (admin/investigador). */
   codigo_unico?: string;
   nombre: string;
+  nombre_comun?: string | null;
+  nombre_cientifico?: string | null;
+  cantera_sitio?: string | null;
+  explorador_publico?: string | null;
   categoria_codigo?: string | null;
   categoria_nombre?: string | null;
   era_nombre?: string | null;
@@ -29,6 +34,7 @@ export type ApiFosilRow = {
   categoria_id?: number;
   periodo_id?: number;
   era_id?: number;
+  /** Campos sensibles: solo deben venir en endpoints autenticados (admin/investigador). */
   latitud?: number | string | null;
   longitud?: number | string | null;
   slug?: string | null;
@@ -41,6 +47,43 @@ export type ApiFosilRow = {
   ubicacion?: string | null;
   descripcion_ubicacion?: string | null;
 };
+
+export type PublicMapPointRow = {
+  id: number;
+  slug?: string | null;
+  nombre: string;
+  latitud: number | string;
+  longitud: number | string;
+  categoria_codigo?: string | null;
+  portada_url?: string | null;
+  canton_nombre?: string | null;
+  provincia_nombre?: string | null;
+  pais_nombre?: string | null;
+};
+
+export async function fetchMapaPublicoPoints(): Promise<{
+  ok: boolean;
+  data: PublicMapPointRow[];
+  error?: string;
+}> {
+  try {
+    const res = await fetch(apiUrl("/api/fosiles/publico/mapa"), {
+      cache: "no-store",
+      credentials: "include",
+    });
+    if (!res.ok) {
+      return { ok: false, data: [], error: res.statusText };
+    }
+    const data = await res.json().catch(() => []);
+    return { ok: true, data: Array.isArray(data) ? data : [] };
+  } catch (e) {
+    return {
+      ok: false,
+      data: [],
+      error: e instanceof Error ? e.message : "fetch failed",
+    };
+  }
+}
 
 export async function fetchFosilesPublic(params?: {
   periodo_id?: number;
@@ -72,7 +115,7 @@ export async function fetchFosilesPublic(params?: {
   const url = apiUrl(`/api/fosiles${sp.toString() ? `?${sp.toString()}` : ""}`);
   try {
     const res = await fetch(url, {
-      next: { revalidate: 30 },
+      cache: "no-store",
       credentials: "include",
     });
     if (!res.ok) {
@@ -116,7 +159,7 @@ export async function fetchFosilPublicById(
 ): Promise<ApiFosilRow | null> {
   try {
     const res = await fetch(apiUrl(`/api/fosiles/${encodeURIComponent(id)}`), {
-      next: { revalidate: 30 },
+      cache: "no-store",
       credentials: "include",
     });
     if (!res.ok) return null;
@@ -844,15 +887,19 @@ export type MultimediaRow = {
   nombre_archivo?: string;
   descripcion?: string | null;
   es_principal?: boolean;
+  orden?: number;
 };
 
 export type CatalogoImagenRow = {
   multimedia_id: number;
   imagen_url: string;
+  nombre_archivo?: string | null;
   subtipo?: string;
   imagen_descripcion?: string | null;
   id: number;
   nombre: string;
+  nombre_comun?: string | null;
+  nombre_cientifico?: string | null;
   codigo_unico?: string;
   descripcion_general?: string;
   categoria_id?: number;
@@ -860,6 +907,8 @@ export type CatalogoImagenRow = {
   categoria_nombre?: string | null;
   era_nombre?: string | null;
   periodo_nombre?: string | null;
+  ubicacion?: string | null;
+  explorador_publico?: string | null;
 };
 
 export async function fetchCatalogoPublicoImagenes(params?: {
@@ -895,7 +944,7 @@ export async function fetchCatalogoPublicoImagenes(params?: {
   if (params?.include_total) sp.set("include_total", "1");
   const url = apiUrl(`/api/multimedia/publico/catalogo?${sp.toString()}`);
   try {
-    const res = await fetch(url, { next: { revalidate: 30 }, credentials: "include" });
+    const res = await fetch(url, { cache: "no-store", credentials: "include" });
     if (!res.ok) {
       return { ok: false, data: [], error: res.statusText, page, page_size: pageSize, total: 0, has_next: false };
     }
@@ -941,7 +990,7 @@ export async function fetchMultimediaFosilPublic(
 ): Promise<MultimediaRow[]> {
   const res = await fetch(
     apiUrl(`/api/multimedia/publico/fosil/${encodeURIComponent(String(fosilId))}`),
-    { next: { revalidate: 30 }, credentials: "include" },
+    { cache: "no-store", credentials: "include" },
   );
   if (!res.ok) {
     return [];
@@ -962,7 +1011,10 @@ export async function fetchMultimediaFosil(
         : "No se pudo cargar multimedia",
     );
   }
-  return Array.isArray(data) ? data : [];
+  if (Array.isArray(data)) return data;
+  const wrapped = (data as { data?: unknown }).data;
+  if (Array.isArray(wrapped)) return wrapped as MultimediaRow[];
+  return [];
 }
 
 export async function uploadMultimediaFosil(

@@ -7,8 +7,8 @@ const auth = require("../../middlewares/auth");
 const checkRole = require("../../middlewares/roles");
 const controller = require("./multimedia.controller");
 
-const IMAGE_MIME = /^image\/(jpeg|png|gif|webp)$/i;
-const IMAGE_EXT = /\.(jpe?g|png|gif|webp)$/i;
+const IMAGE_MIME = /^image\/(jpeg|png|gif|webp|avif)$/i;
+const IMAGE_EXT = /\.(jpe?g|png|gif|webp|avif)$/i;
 const VIDEO_MIME = /^video\/(mp4|webm|quicktime|x-msvideo|x-matroska)$/i;
 const VIDEO_EXT = /\.(mp4|webm|mov|mkv)$/i;
 

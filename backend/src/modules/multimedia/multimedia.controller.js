@@ -1,5 +1,6 @@
 const crypto = require("crypto");
 const fs = require("fs");
+const { IMAGES_DIR, VIDEOS_DIR } = require("../../config/paths");
 const path = require("path");
 const { optimizarParaGuardar } = require("./multimedia.image");
 const service = require("./multimedia.service");
@@ -162,7 +163,7 @@ const uploadParaFosil = async (req, res) => {
       if (video) {
         const ext = videoExtension(file);
         const baseName = `fosil_${fosil_id}_${crypto.randomUUID()}${ext}`;
-        const absDir = path.join(process.cwd(), "videos", subdir);
+        const absDir = path.join(VIDEOS_DIR, subdir);
         fs.mkdirSync(absDir, { recursive: true });
         absPath = path.join(absDir, baseName);
         fs.writeFileSync(absPath, inputBuffer);
@@ -182,7 +183,7 @@ const uploadParaFosil = async (req, res) => {
           });
         }
         const baseName = `fosil_${fosil_id}_${crypto.randomUUID()}.webp`;
-        const absDir = path.join(process.cwd(), "images", subdir);
+        const absDir = path.join(IMAGES_DIR, subdir);
         fs.mkdirSync(absDir, { recursive: true });
         absPath = path.join(absDir, baseName);
         fs.writeFileSync(absPath, procesado);

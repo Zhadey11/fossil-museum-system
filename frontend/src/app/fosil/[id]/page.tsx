@@ -8,6 +8,7 @@ import {
   multimediaAbsUrl,
 } from "@/lib/api";
 import { FosilDetalleTabs } from "@/components/FosilDetalleTabs";
+import { tituloPublicoFosil } from "@/lib/fosilesDisplay";
 
 type Props = { params: Promise<{ id: string }> };
 function formatDate(dateLike?: string | null): string {
@@ -22,7 +23,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const api = await fetchFosilPublicById(id);
   if (api) {
     return {
-      title: api.nombre,
+      title: tituloPublicoFosil(api),
       description: api.descripcion_general?.slice(0, 160),
     };
   }
@@ -40,9 +41,12 @@ export default async function FosilFichaPage({ params }: Props) {
 
   if (api) {
     const media = await fetchMultimediaFosilPublic(api.id);
-    const descubridor = [api.explorador_nombre, api.explorador_apellido]
-      .filter((x) => typeof x === "string" && x.trim().length > 0)
-      .join(" ");
+    const descubridor =
+      api.explorador_publico?.trim() ||
+      [api.explorador_nombre, api.explorador_apellido]
+        .filter((x) => typeof x === "string" && x.trim().length > 0)
+        .join(" ");
+    const titulo = tituloPublicoFosil(api);
 
     return (
       <div
@@ -65,17 +69,16 @@ export default async function FosilFichaPage({ params }: Props) {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={api.portada_url ? multimediaAbsUrl(api.portada_url) : "/catalogo-imagenes/amonita.svg"}
-                alt={`Portada · ${api.nombre}`}
+                alt={`Portada · ${titulo}`}
                 className="fossil-main-image"
                 loading="eager"
                 fetchPriority="high"
               />
               <div className="fossil-main-overlay">
-                <h1>{api.nombre}</h1>
+                <h1>{titulo}</h1>
                 <div className="fossil-main-badges">
                   <span>{api.categoria_nombre || "Categoría"}</span>
                   <span>{api.era_nombre || "Era"}</span>
-                  <span>{api.estado || "Estado"}</span>
                 </div>
               </div>
             </div>
@@ -83,6 +86,9 @@ export default async function FosilFichaPage({ params }: Props) {
               <h2>Resumen</h2>
               <p>{api.descripcion_general || "Sin descripción disponible."}</p>
               <p><strong>Ubicación:</strong> {api.ubicacion || api.descripcion_ubicacion || api.pais || "No disponible"}</p>
+              {api.cantera_sitio ? (
+                <p><strong>Formación / yacimiento:</strong> {api.cantera_sitio}</p>
+              ) : null}
               <p><strong>Fecha de hallazgo:</strong> {formatDate(api.fecha_hallazgo)}</p>
               <p><strong>Encontrado por:</strong> {descubridor || "No disponible"}</p>
             </aside>
@@ -91,7 +97,6 @@ export default async function FosilFichaPage({ params }: Props) {
           <FosilDetalleTabs
             fosilId={api.id}
             media={media}
-            contextoGeologico={api.contexto_geologico}
           />
         </article>
       </div>

@@ -24,6 +24,15 @@ const getFosilPublico = async (req, res) => {
   }
 };
 
+const getMapaPublico = async (_req, res) => {
+  try {
+    const data = await service.obtenerPuntosMapaPublico();
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 const getDetalleCompleto = async (req, res) => {
   try {
     const roles = req.user.roles || [];
@@ -149,6 +158,7 @@ module.exports = {
   getFosiles,
   getMisRegistros,
   getInvestigadorCatalogo,
+  getMapaPublico,
   getFosilPublico,
   getDetalleCompleto,
   createFosil,
