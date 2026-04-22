@@ -8,11 +8,18 @@ function getTransporter() {
   if (!process.env.MAIL_HOST || !process.env.MAIL_USER || !process.env.MAIL_PASS) {
     return null;
   }
+  const port = parseInt(process.env.MAIL_PORT || "587", 10);
+  const secure =
+    String(process.env.MAIL_SECURE || "false").toLowerCase() === "true" || port === 465;
   transporter = nodemailer.createTransport({
     host: process.env.MAIL_HOST,
-    port: parseInt(process.env.MAIL_PORT || "587", 10),
-    secure: String(process.env.MAIL_SECURE || "false") === "true",
+    port,
+    secure,
     auth: { user: process.env.MAIL_USER, pass: process.env.MAIL_PASS },
+    tls: {
+      rejectUnauthorized:
+        String(process.env.MAIL_TLS_REJECT_UNAUTHORIZED || "true").toLowerCase() !== "false",
+    },
   });
   return transporter;
 }
@@ -26,8 +33,17 @@ async function getTableNames() {
         id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
         correo NVARCHAR(255) NOT NULL UNIQUE,
         fecha_suscripcion DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
-        activo BIT NOT NULL DEFAULT 1
+        activo BIT NOT NULL DEFAULT 1,
+        deleted_at DATETIME2 NULL
       );
+    END;
+    IF OBJECT_ID('dbo.SUSCRIPTORES', 'U') IS NOT NULL AND COL_LENGTH('dbo.SUSCRIPTORES', 'deleted_at') IS NULL
+    BEGIN
+      ALTER TABLE dbo.SUSCRIPTORES ADD deleted_at DATETIME2 NULL;
+    END;
+    IF OBJECT_ID('dbo.SUSCRIPTOR', 'U') IS NOT NULL AND COL_LENGTH('dbo.SUSCRIPTOR', 'deleted_at') IS NULL
+    BEGIN
+      ALTER TABLE dbo.SUSCRIPTOR ADD deleted_at DATETIME2 NULL;
     END;
     IF OBJECT_ID('dbo.SUSCRIPTORES_NOTIFICACIONES', 'U') IS NULL AND OBJECT_ID('dbo.SUSCRIPTOR_NOTIFICACION', 'U') IS NULL
     BEGIN
@@ -59,12 +75,14 @@ const suscribir = async (correo) => {
     .query(`
       IF EXISTS(SELECT 1 FROM ${t.subs} WHERE correo = @correo)
       BEGIN
-        UPDATE ${t.subs} SET activo = 1, fecha_suscripcion = GETDATE() WHERE correo = @correo;
+        UPDATE ${t.subs}
+        SET activo = 1, fecha_suscripcion = GETDATE(), deleted_at = NULL
+        WHERE correo = @correo;
       END
       ELSE
       BEGIN
-        INSERT INTO ${t.subs} (correo, fecha_suscripcion, activo)
-        VALUES (@correo, GETDATE(), 1);
+        INSERT INTO ${t.subs} (correo, fecha_suscripcion, activo, deleted_at)
+        VALUES (@correo, GETDATE(), 1, NULL);
       END
     `);
   return { mensaje: "¡Suscripción exitosa!" };
@@ -73,8 +91,9 @@ const suscribir = async (correo) => {
 const listar = async () => {
   const t = await getTableNames();
   const r = await pool.request().query(`
-    SELECT id, correo, fecha_suscripcion, activo
+    SELECT id, correo, fecha_suscripcion, activo, deleted_at
     FROM ${t.subs}
+    WHERE deleted_at IS NULL
     ORDER BY fecha_suscripcion DESC, id DESC
   `);
   return r.recordset;
@@ -86,13 +105,23 @@ const cambiarActivo = async (id, activo) => {
     .request()
     .input("id", id)
     .input("activo", activo ? 1 : 0)
-    .query(`UPDATE ${t.subs} SET activo = @activo WHERE id = @id`);
+    .query(`
+      UPDATE ${t.subs}
+      SET activo = @activo,
+          deleted_at = CASE WHEN @activo = 1 THEN NULL ELSE COALESCE(deleted_at, GETDATE()) END
+      WHERE id = @id
+    `);
   return { id, activo: !!activo };
 };
 
 const eliminar = async (id) => {
   const t = await getTableNames();
-  await pool.request().input("id", id).query(`DELETE FROM ${t.subs} WHERE id = @id`);
+  await pool.request().input("id", id).query(`
+    UPDATE ${t.subs}
+    SET activo = 0,
+        deleted_at = COALESCE(deleted_at, GETDATE())
+    WHERE id = @id
+  `);
   return { id };
 };
 
@@ -112,6 +141,7 @@ const notificarActivos = async ({ tipo, titulo, cuerpo }) => {
     SELECT id, correo
     FROM ${t.subs}
     WHERE activo = 1
+      AND deleted_at IS NULL
     ORDER BY id ASC
   `);
   const activos = rs.recordset || [];

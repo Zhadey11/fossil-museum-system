@@ -28,7 +28,14 @@ export default function PanelLoading() {
             marginBottom: "1.2rem",
           }}
         />
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(120px, 1fr))", gap: "0.75rem", marginBottom: "1rem" }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 140px), 1fr))",
+            gap: "0.75rem",
+            marginBottom: "1rem",
+          }}
+        >
           {Array.from({ length: 4 }).map((_, idx) => (
             <div
               key={idx}

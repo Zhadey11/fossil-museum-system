@@ -121,7 +121,7 @@ export default function MapaFosiles({ points }: MapaFosilesProps) {
       puntosEnMapa.forEach(({ point: p, lat, lng }) => {
         const m = L.marker([lat, lng], { icon: whitePin });
         const loc = [p.canton, p.provincia].filter(Boolean).join(" · ");
-        m.bindPopup(`<div class="map-popup-inner"><img class="map-popup-thumb" src="${escapeHtml((p as { thumb?: string }).thumb || "/images/FondoInicial.jpg")}" alt="${escapeHtml(p.nombre)}" /><strong>${escapeHtml(p.nombre)}</strong><span class="map-popup-badge">${escapeHtml((p as { categoria?: string }).categoria || "FOS")}</span>${loc ? `<p style="font-size:12px;opacity:.85">${escapeHtml(loc)}</p>` : ""}<p>${escapeHtml(p.resumen)}</p><a class="map-popup-link" href="/fosil/${p.id}">Ver ficha →</a></div>`, { maxWidth: 280 });
+        m.bindPopup(`<div class="map-popup-inner"><img class="map-popup-thumb" src="${escapeHtml((p as { thumb?: string }).thumb || "/images/FondoInicial.jpg")}" alt="${escapeHtml(p.nombre)}" /><strong>${escapeHtml(p.nombre)}</strong><span class="map-popup-badge">${escapeHtml((p as { categoria?: string }).categoria || "FOS")}</span>${loc ? `<p style="font-size:12px;opacity:.85">${escapeHtml(loc)}</p>` : ""}<p>${escapeHtml(p.resumen)}</p><a class="map-popup-link" href="/fosil/${p.id}">Ver ficha &gt;</a></div>`, { maxWidth: 280 });
         m.addTo(layer);
       });
 

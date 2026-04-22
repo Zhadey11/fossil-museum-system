@@ -134,7 +134,7 @@ function ExploradorContent() {
                       }}
                     >
                       <details>
-                        <summary className="cursor-pointer text-sm text-[var(--bonedim)]">
+                        <summary style={{ cursor: "pointer", fontSize: "0.92rem", color: "var(--bonedim)" }}>
                           Fotos y videos
                         </summary>
                         <FosilMultimediaBlock fosilId={r.id} />

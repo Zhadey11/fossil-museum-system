@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { SiteFooter } from "@/components/SiteFooter";
 import { TopNav } from "@/components/TopNav";
 import "./globals.css";
@@ -14,6 +14,12 @@ const googleFontsHref =
   "family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400;1,600&" +
   "family=Source+Sans+3:wght@300;400;500;600&" +
   "display=swap";
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
 
 export const metadata: Metadata = {
   title: {

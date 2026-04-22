@@ -137,7 +137,7 @@ export default function InvestigadorFosilDetallePage() {
         <div className="sec-rule" />
         <p className="sec-body" style={{ marginTop: "1rem" }}>
           <Link href="/panel/investigador" className="catalog-clear-filter">
-            ← Volver al panel
+            &lt; Volver al panel
           </Link>
         </p>
       </header>

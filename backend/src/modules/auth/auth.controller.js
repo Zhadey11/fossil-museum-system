@@ -29,6 +29,19 @@ const login = async (req, res) => {
   }
 };
 
+const register = async (req, res) => {
+  try {
+    const data = await service.register(req.body || {});
+    res.status(201).json({
+      mensaje: "Cuenta creada correctamente",
+      data,
+    });
+  } catch (error) {
+    console.error("Register error:", error.message);
+    res.status(400).json({ error: error.message });
+  }
+};
+
 const logout = async (req, res) => {
   try {
     const cookieName = process.env.AUTH_COOKIE_NAME || "fossiles_token";
@@ -44,4 +57,4 @@ const logout = async (req, res) => {
   }
 };
 
-module.exports = { login, logout };
+module.exports = { login, register, logout };

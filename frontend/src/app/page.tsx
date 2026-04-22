@@ -1,6 +1,5 @@
 import Link from "next/link";
 import Image from "next/image";
-import { HeroFossilSvg } from "@/components/HeroFossilSvg";
 import { HomeGalleryCarousel, HomeNewsletterForm, HomeStats } from "@/components/HomeSectionsClient";
 import { Reveal } from "@/components/Reveal";
 import { itemsGaleriaInstalaciones } from "@/data/instalacionesGaleria";
@@ -33,8 +32,6 @@ export default async function Home() {
         <div className="grain" aria-hidden />
         <div className="hero-vignette" aria-hidden />
         <div className="shaft" aria-hidden />
-        <HeroFossilSvg />
-
         <div className="hero-content">
           <p className="hero-eyebrow">
             Desde 1987 · Colección fósil · 12.400+ especímenes

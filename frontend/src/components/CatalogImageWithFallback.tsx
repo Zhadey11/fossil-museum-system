@@ -10,7 +10,8 @@ type Props = {
 };
 
 /**
- * Evita next/image con /__api-media: si el archivo no existe en el API, el optimizador falla ("received null").
+ * Evita next/image con URLs del API: si el archivo no existe, el optimizador falla ("received null");
+ * usamos <img> con multimediaAbsUrl (URL absoluta a `NEXT_PUBLIC_API_URL`) y fallback.
  * Con <img> + onError pasamos al placeholder local.
  */
 export function CatalogImageWithFallback({ src, fallback, alt, className }: Props) {

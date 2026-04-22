@@ -105,13 +105,8 @@ const obtenerFosiles = async (query) => {
     WHERE f.deleted_at IS NULL
   `;
 
-  if (query.estado) {
-    sql += ` AND f.estado = @estado`;
-    request.input("estado", query.estado);
-  } else {
-    sql += ` AND f.estado = @estado_default`;
-    request.input("estado_default", "publicado");
-  }
+  sql += ` AND f.estado = @estado_default`;
+  request.input("estado_default", "publicado");
 
   if (query.periodo_id) {
     sql += ` AND f.periodo_id = @periodo_id`;
@@ -182,12 +177,68 @@ const obtenerFosilPublicoPorId = async (id) => {
   return result.recordset[0];
 };
 
+const CR_BOUNDS = {
+  minLat: 8.0,
+  maxLat: 11.5,
+  minLng: -86.2,
+  maxLng: -82.2,
+};
+
+function enRangoCostaRica(lat, lng) {
+  return (
+    Number.isFinite(lat) &&
+    Number.isFinite(lng) &&
+    lat >= CR_BOUNDS.minLat &&
+    lat <= CR_BOUNDS.maxLat &&
+    lng >= CR_BOUNDS.minLng &&
+    lng <= CR_BOUNDS.maxLng
+  );
+}
+
+/**
+ * Intenta usar coordenadas reales del registro:
+ * - Si ya están en rango CR: se usan.
+ * - Si vienen invertidas (lat<->lng): las corrige.
+ * - Si no son válidas para mapa público: null.
+ */
+function normalizarLatLngParaMapa(latRaw, lngRaw) {
+  const lat = Number(latRaw);
+  const lng = Number(lngRaw);
+  if (enRangoCostaRica(lat, lng)) {
+    return { latitud: lat, longitud: lng, aproximada: false };
+  }
+  // Algunos registros históricos pueden venir invertidos en edición manual.
+  if (enRangoCostaRica(lng, lat)) {
+    return { latitud: lng, longitud: lat, aproximada: false };
+  }
+  return null;
+}
+
+/**
+ * Coordenadas aproximadas para mapa público cuando no hay GPS usable.
+ * Se derivan solo de id + canton_id para ubicar un pin dentro de Costa Rica sin exponer precisión.
+ */
+function latLngMapaPublico(fosilId, cantonId) {
+  const a = Number(fosilId) || 0;
+  const b = Number(cantonId) || 0;
+  const seed = (a * 2654435761 + b * 2246822519 + 374761393) >>> 0;
+  const u1 = (seed & 0xffff) / 0xffff;
+  const u2 = ((seed >>> 16) & 0xffff) / 0xffff;
+  const lat = 8.15 + u1 * (11.35 - 8.15);
+  const lng = -85.95 + u2 * (-82.45 - -85.95);
+  return {
+    latitud: Math.round(lat * 100) / 100,
+    longitud: Math.round(lng * 100) / 100,
+  };
+}
+
 const obtenerPuntosMapaPublico = async () => {
   const result = await pool.request().query(`
     SELECT
       f.id,
       f.slug,
       f.nombre,
+      f.canton_id,
       f.latitud,
       f.longitud,
       cf.codigo AS categoria_codigo,
@@ -212,11 +263,20 @@ const obtenerPuntosMapaPublico = async () => {
     LEFT JOIN PAIS pa ON pa.id = prov.pais_id
     WHERE f.deleted_at IS NULL
       AND f.estado = 'publicado'
-      AND f.latitud IS NOT NULL
-      AND f.longitud IS NOT NULL
     ORDER BY f.created_at DESC, f.id DESC
   `);
-  return result.recordset || [];
+  const rows = result.recordset || [];
+  return rows.map((row) => {
+    const normalizada = normalizarLatLngParaMapa(row.latitud, row.longitud);
+    const coords = normalizada || latLngMapaPublico(row.id, row.canton_id);
+    const { canton_id: _omit, ...rest } = row;
+    return {
+      ...rest,
+      latitud: Math.round(coords.latitud * 100000) / 100000,
+      longitud: Math.round(coords.longitud * 100000) / 100000,
+      ubicacion_mapa_aproximada: normalizada ? false : true,
+    };
+  });
 };
 
 const obtenerDetalleCompleto = async (id) => {
@@ -452,16 +512,15 @@ const eliminarFosil = async (id) => {
     `);
 };
 
-const cambiarEstadoFosil = async (id, estado) => {
+/** Cambio de estado vía SP (auditoría en BD). No usar para publicado/rechazado desde HTTP: ir por admin.service. */
+const cambiarEstadoFosil = async (id, estado, adminId) => {
   await pool
     .request()
-    .input("id", id)
-    .input("estado", estado)
-    .query(`
-      UPDATE FOSIL
-      SET estado = @estado
-      WHERE id = @id
-    `);
+    .input("fosil_id", id)
+    .input("nuevo_estado", estado)
+    .input("admin_id", adminId)
+    .input("notas", null)
+    .execute("sp_cambiar_estado_fosil");
 
   return { id, estado };
 };

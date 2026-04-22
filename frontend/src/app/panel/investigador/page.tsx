@@ -29,6 +29,10 @@ function InvestigadorContent() {
   const [attemptedSubmit, setAttemptedSubmit] = useState(false);
   const [filtroNombre, setFiltroNombre] = useState("");
   const [filtroEstado, setFiltroEstado] = useState("");
+  const [filtroCategoria, setFiltroCategoria] = useState("");
+  const [filtroEra, setFiltroEra] = useState("");
+  const [filtroPeriodo, setFiltroPeriodo] = useState("");
+  const [filtroUbicacion, setFiltroUbicacion] = useState("");
   const [tab, setTab] = useState<"solicitudes" | "investigando">("solicitudes");
 
   const refresh = useCallback(async () => {
@@ -104,7 +108,21 @@ function InvestigadorContent() {
       ? r.nombre?.toLowerCase().includes(filtroNombre.toLowerCase())
       : true;
     const byEstado = filtroEstado ? r.estado === filtroEstado : true;
-    return byName && byEstado;
+    const byCategoria = filtroCategoria
+      ? String(r.categoria_codigo || "").toLowerCase() === filtroCategoria.toLowerCase()
+      : true;
+    const byEra = filtroEra
+      ? String(r.era_nombre || "").toLowerCase().includes(filtroEra.toLowerCase())
+      : true;
+    const byPeriodo = filtroPeriodo
+      ? String(r.periodo_nombre || "").toLowerCase().includes(filtroPeriodo.toLowerCase())
+      : true;
+    const byUbicacion = filtroUbicacion
+      ? String(r.descripcion_ubicacion || r.ubicacion || "")
+          .toLowerCase()
+          .includes(filtroUbicacion.toLowerCase())
+      : true;
+    return byName && byEstado && byCategoria && byEra && byPeriodo && byUbicacion;
   });
   const missingSolicitud = {
     fosiles: attemptedSubmit && selected.size === 0,
@@ -137,14 +155,17 @@ function InvestigadorContent() {
         </p>
       ) : null}
 
-      <div className="flex gap-2" style={{ marginBottom: "1rem" }}>
+      <div className="flex gap-2" style={{ marginBottom: "1.25rem" }}>
         <button
           type="button"
-          className="rounded-sm border px-3 py-1.5 text-sm"
+          className="rounded-sm border"
           style={{
-            borderColor: "var(--border)",
+            borderColor: tab === "solicitudes" ? "var(--amber)" : "var(--border)",
             background: tab === "solicitudes" ? "var(--amber)" : "var(--surface)",
             color: tab === "solicitudes" ? "var(--ink)" : "var(--bone)",
+            padding: "0.5rem 1.2rem",
+            fontSize: "0.92rem",
+            fontWeight: tab === "solicitudes" ? 600 : 400,
           }}
           onClick={() => setTab("solicitudes")}
         >
@@ -152,11 +173,14 @@ function InvestigadorContent() {
         </button>
         <button
           type="button"
-          className="rounded-sm border px-3 py-1.5 text-sm"
+          className="rounded-sm border"
           style={{
-            borderColor: "var(--border)",
+            borderColor: tab === "investigando" ? "var(--amber)" : "var(--border)",
             background: tab === "investigando" ? "var(--amber)" : "var(--surface)",
             color: tab === "investigando" ? "var(--ink)" : "var(--bone)",
+            padding: "0.5rem 1.2rem",
+            fontSize: "0.92rem",
+            fontWeight: tab === "investigando" ? 600 : 400,
           }}
           onClick={() => setTab("investigando")}
         >
@@ -328,6 +352,39 @@ function InvestigadorContent() {
               <option value="en_revision">En revisión</option>
               <option value="rechazado">Rechazado</option>
             </select>
+            <select
+              value={filtroCategoria}
+              onChange={(e) => setFiltroCategoria(e.target.value)}
+              className="rounded-sm border px-2 py-1.5 text-sm"
+              style={{ borderColor: "var(--border)", background: "var(--surface)" }}
+            >
+              <option value="">Todas las categorías</option>
+              <option value="FOS">FOS</option>
+              <option value="MIN">MIN</option>
+              <option value="PAL">PAL</option>
+              <option value="ROC">ROC</option>
+            </select>
+            <input
+              placeholder="Filtrar por era"
+              value={filtroEra}
+              onChange={(e) => setFiltroEra(e.target.value)}
+              className="rounded-sm border px-2 py-1.5 text-sm"
+              style={{ borderColor: "var(--border)", background: "var(--surface)" }}
+            />
+            <input
+              placeholder="Filtrar por período"
+              value={filtroPeriodo}
+              onChange={(e) => setFiltroPeriodo(e.target.value)}
+              className="rounded-sm border px-2 py-1.5 text-sm"
+              style={{ borderColor: "var(--border)", background: "var(--surface)" }}
+            />
+            <input
+              placeholder="Filtrar por ubicación"
+              value={filtroUbicacion}
+              onChange={(e) => setFiltroUbicacion(e.target.value)}
+              className="rounded-sm border px-2 py-1.5 text-sm"
+              style={{ borderColor: "var(--border)", background: "var(--surface)" }}
+            />
           </div>
           {rowsFiltrados.length === 0 ? (
             <p className="sec-body">

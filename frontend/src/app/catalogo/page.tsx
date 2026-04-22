@@ -49,6 +49,9 @@ export const metadata: Metadata = {
   description: "Colección pública de fósiles catalogados por era, período y categoría.",
 };
 
+/** Nunca servir caché vacía del catálogo mientras se carga / restaura la BD. */
+export const dynamic = "force-dynamic";
+
 export default async function CatalogoPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const q = asText(params.q);
@@ -163,7 +166,13 @@ export default async function CatalogoPage({ searchParams }: PageProps) {
           <form method="get" className="catalog-filter-form">
             <input type="hidden" name="q" value={q} />
             <input type="hidden" name="categoria" value={categoria} />
-            <input type="hidden" name="ubicacion" value={ubicacion} />
+            <input
+              name="ubicacion"
+              defaultValue={ubicacion}
+              placeholder="Ubicación (provincia, cantón)"
+              className="catalog-search-input"
+              style={{ minWidth: "15rem", maxWidth: "20rem", padding: "0.55rem 0.7rem" }}
+            />
             <select name="era" defaultValue={era} className="catalog-select">
               <option value="">Todas las eras</option>
               {ERA_OPTIONS.map((opt) => (
@@ -205,9 +214,34 @@ export default async function CatalogoPage({ searchParams }: PageProps) {
 
       <section className="catalog-cards-grid">
         {fossils.length === 0 ? (
-          <p className="sec-body" style={{ gridColumn: "1 / -1", textAlign: "center" }}>
-            No hay resultados para mostrar.
-          </p>
+          <div
+            className="sec-body"
+            style={{
+              gridColumn: "1 / -1",
+              textAlign: "center",
+              maxWidth: "40rem",
+              margin: "0 auto",
+            }}
+          >
+            {!apiResult.ok ? (
+              <p>Revisá que el API esté en marcha (p. ej. <code style={{ fontSize: "0.9em" }}>http://localhost:4000/api/health</code>) y recargá.</p>
+            ) : hasActiveFilters ? (
+              <p>
+                No hay resultados con estos filtros.{" "}
+                <Link href="/catalogo" className="catalog-clear-filter">
+                  Reiniciar filtros
+                </Link>
+              </p>
+            ) : (
+              <p className="text-sm" style={{ lineHeight: 1.6, opacity: 0.95 }}>
+                El listado vacío indica <strong>sin datos de catálogo en la BD</strong> o que el <strong>API</strong> no
+                pudo leer <code>dbo.FOSIL</code> + <code>dbo.MULTIMEDIA</code> (solo{" "}
+                <code>estado = publicado</code> e imágenes). Restaurá con{" "}
+                <code>database/ORDEN_EJECUCION.txt</code> (hasta 05 y 07 como mínimo)                 y comprobá en consola:{" "}
+                <code className="text-xs" style={{ wordBreak: "break-all" }}>{`cd backend && npm run ver:catalogo-publico`}</code>
+              </p>
+            )}
+          </div>
         ) : (
           fossils.map((fossil) => (
             <article key={fossil.id} className="catalog-fossil-card">
@@ -243,7 +277,7 @@ export default async function CatalogoPage({ searchParams }: PageProps) {
               <footer className="catalog-card-footer">
                 <span className="catalog-location">{fossil.category}</span>
                 <Link href={fossil.fichaHref || "/catalogo"} className="catalog-detail-link">
-                  Ver detalle →
+                  Ver detalle &gt;
                 </Link>
               </footer>
             </article>

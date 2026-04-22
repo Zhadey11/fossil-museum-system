@@ -115,10 +115,6 @@ const nextConfig: NextConfig = {
         source: "/__api/:path*",
         destination: `${base}/:path*`,
       },
-      {
-        source: "/__api-media/:path*",
-        destination: `${base}/:path*`,
-      },
     ];
   },
 };

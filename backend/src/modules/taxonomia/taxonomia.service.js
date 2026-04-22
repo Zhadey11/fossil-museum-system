@@ -1,10 +1,21 @@
 const { pool } = require('../../config/db');
 
+async function ensureTaxonomiaSoftDeleteColumn() {
+  await pool.request().query(`
+    IF COL_LENGTH('dbo.TAXONOMIA', 'deleted_at') IS NULL
+    BEGIN
+      ALTER TABLE TAXONOMIA ADD deleted_at DATETIME2 NULL;
+    END;
+  `);
+}
+
 // GET TODAS
 const obtenerTaxonomias = async () => {
+  await ensureTaxonomiaSoftDeleteColumn();
   const result = await pool.request().query(`
     SELECT *
     FROM TAXONOMIA
+    WHERE deleted_at IS NULL
     ORDER BY id DESC
   `);
 
@@ -13,12 +24,14 @@ const obtenerTaxonomias = async () => {
 
 // GET POR ID
 const obtenerTaxonomiaPorId = async (id) => {
+  await ensureTaxonomiaSoftDeleteColumn();
   const result = await pool.request()
     .input('id', id)
     .query(`
       SELECT *
       FROM TAXONOMIA
       WHERE id = @id
+        AND deleted_at IS NULL
     `);
 
   return result.recordset[0];
@@ -26,6 +39,7 @@ const obtenerTaxonomiaPorId = async (id) => {
 
 // CREAR
 const crearTaxonomia = async (data) => {
+  await ensureTaxonomiaSoftDeleteColumn();
   const result = await pool.request()
     .input('reino', data.reino)
     .input('filo', data.filo)
@@ -37,10 +51,10 @@ const crearTaxonomia = async (data) => {
 
     .query(`
       INSERT INTO TAXONOMIA (
-        reino, filo, clase, orden, familia, genero, especie
+        reino, filo, clase, orden, familia, genero, especie, deleted_at
       )
       VALUES (
-        @reino, @filo, @clase, @orden, @familia, @genero, @especie
+        @reino, @filo, @clase, @orden, @familia, @genero, @especie, NULL
       );
 
       SELECT SCOPE_IDENTITY() AS id;
@@ -49,12 +63,14 @@ const crearTaxonomia = async (data) => {
   return result.recordset[0];
 };
 
-// DELETE (físico, porque NO hay soft delete)
+// DELETE lógico
 const eliminarTaxonomia = async (id) => {
+  await ensureTaxonomiaSoftDeleteColumn();
   await pool.request()
     .input('id', id)
     .query(`
-      DELETE FROM TAXONOMIA
+      UPDATE TAXONOMIA
+      SET deleted_at = COALESCE(deleted_at, GETDATE())
       WHERE id = @id
     `);
 

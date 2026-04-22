@@ -56,7 +56,7 @@ export default async function MapaPage() {
         <MapaFosilesLoader points={points} />
         <p className="mapa-fosiles-back">
           <Link href="/catalogo" className="catalog-clear-filter">
-            ← Colección
+            &lt; Colección
           </Link>
         </p>
       </section>

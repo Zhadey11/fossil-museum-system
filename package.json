@@ -6,15 +6,21 @@
     "dev": "npm run dev --prefix frontend",
     "dev:backend": "npm run dev --prefix backend",
     "dev:all": "concurrently -n backend,web -c cyan,magenta \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
+    "dev:all:lan": "concurrently -n backend,web -c cyan,magenta \"npm run dev --prefix backend\" \"npm run dev:lan --prefix frontend\"",
     "build": "npm run build --prefix frontend",
     "start": "npm run start --prefix frontend",
     "lint": "npm run lint --prefix frontend",
-    "verify:contracts": "node backend/scripts/verify-contracts.js",
+    "verify:contracts": "node backend/scripts/verify-contracts_ts.js",
     "verify:media": "npm run check:media --prefix backend",
     "sync:fossil-images": "npm run sync:images --prefix backend",
     "audit:media-consistency": "npm run audit:media-consistency --prefix backend",
     "fix:media-filename-dups": "npm run fix:media-filename-dups --prefix backend",
-    "fix:media-filename-dups:apply": "npm run fix:media-filename-dups:apply --prefix backend"
+    "fix:media-filename-dups:apply": "npm run fix:media-filename-dups:apply --prefix backend",
+    "docker:prepare": "node docker/prepare.js",
+    "docker:up": "node docker/prepare.js && node docker/check-docker-cli_ts.js && docker compose -f docker/docker-compose.yml --env-file docker/compose.env up --build",
+    "docker:down": "node docker/check-docker-cli_ts.js && docker compose -f docker/docker-compose.yml down",
+    "docker:reset": "node docker/check-docker-cli_ts.js && docker compose -f docker/docker-compose.yml down -v",
+    "docker:apply-media": "node docker/check-docker-cli_ts.js && docker compose -f docker/docker-compose.yml exec -T backend npm run apply:media-rules"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

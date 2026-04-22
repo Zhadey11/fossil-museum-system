@@ -6,12 +6,30 @@ export function getApiBaseUrl(): string {
   );
 }
 
+/**
+ * Misma idea que `next.config` (rewrites): en Node/SSR, `localhost` a veces resuelve solo a IPv6
+ * y el fetch falla aunque Express escuche en 0.0.0.0:4000 (Windows / algunos entornos).
+ * En el navegador no se usa: ahí el fetch va por `/__api/...` al mismo host.
+ */
+function getApiBaseUrlForServer(): string {
+  const raw = getApiBaseUrl().replace(/\/$/, "");
+  try {
+    const u = new URL(raw);
+    if (u.hostname === "localhost") {
+      u.hostname = "127.0.0.1";
+    }
+    return u.toString().replace(/\/$/, "");
+  } catch {
+    return raw;
+  }
+}
+
 function apiUrl(path: string): string {
   const normalized = path.startsWith("/") ? path : `/${path}`;
   if (typeof window !== "undefined") {
     return `/__api${normalized}`;
   }
-  return `${getApiBaseUrl()}${normalized}`;
+  return `${getApiBaseUrlForServer()}${normalized}`;
 }
 
 export type ApiFosilRow = {
@@ -54,6 +72,8 @@ export type PublicMapPointRow = {
   nombre: string;
   latitud: number | string;
   longitud: number | string;
+  /** true cuando el backend no envía el GPS real (solo mapa público). */
+  ubicacion_mapa_aproximada?: boolean;
   categoria_codigo?: string | null;
   portada_url?: string | null;
   canton_nombre?: string | null;
@@ -213,6 +233,8 @@ export async function postContacto(body: {
   email: string;
   asunto: string;
   mensaje: string;
+  /** investigador | explorador | colaborador | general — para acuse y flujo admin */
+  tipo_solicitud?: string;
 }): Promise<unknown> {
   const res = await fetch(apiUrl("/api/contacto"), {
     method: "POST",
@@ -543,6 +565,15 @@ export type PapeleraAdminRow = {
   contacto: PapeleraItem[];
 };
 
+export type ReferenciaEstudioRow = {
+  id: number;
+  titulo: string;
+  url: string;
+  tipo?: string;
+  autores?: string | null;
+  anio?: number | null;
+};
+
 export type EstudioFosilRow = {
   id: number;
   fosil_id: number;
@@ -555,12 +586,14 @@ export type EstudioFosilRow = {
   condiciones_hallazgo?: string | null;
   informacion_adicional?: string | null;
   documentacion_contacto?: string | null;
+  publicado?: boolean;
+  created_at?: string;
   investigador_nombre?: string;
   investigador_apellido?: string;
   investigador_email?: string;
   investigador_pais?: string | null;
   investigador_profesion?: string | null;
-  referencias?: { id: number; titulo: string; url: string; tipo?: string }[];
+  referencias?: ReferenciaEstudioRow[];
 };
 
 export type ContactoAdminRow = {
@@ -572,7 +605,49 @@ export type ContactoAdminRow = {
   leido: boolean;
   respondido: boolean;
   created_at: string;
+  solicitud_tipo?: string | null;
+  solicitud_estado?: string | null;
 };
+
+export async function patchAdminContactoAprobarSolicitud(
+  id: number,
+  body?: { password?: string; email?: string },
+): Promise<{
+  mensaje: string;
+  correo_credenciales_enviado?: boolean;
+  correo_error?: string;
+}> {
+  const res = await apiFetch(`/api/contacto/${id}/aprobar-solicitud`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body || {}),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(typeof data.error === "string" ? data.error : "No se pudo aprobar la solicitud");
+  }
+  return data as {
+    mensaje: string;
+    correo_credenciales_enviado?: boolean;
+    correo_error?: string;
+  };
+}
+
+export async function patchAdminContactoRechazarSolicitud(
+  id: number,
+  body?: { nota?: string },
+): Promise<{ mensaje: string; correo_rechazo_enviado?: boolean; correo_error?: string }> {
+  const res = await apiFetch(`/api/contacto/${id}/rechazar-solicitud`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body || {}),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(typeof data.error === "string" ? data.error : "No se pudo rechazar la solicitud");
+  }
+  return data as { mensaje: string; correo_rechazo_enviado?: boolean; correo_error?: string };
+}
 
 /** Solicitud de acceso a datos científicos (IDs del catálogo público + mensaje al admin). */
 export async function postSolicitudInvestigacion(body: {
@@ -876,23 +951,131 @@ export async function fetchEstudiosPorFosil(
   return Array.isArray(data) ? data : [];
 }
 
-/** URL absoluta para servir `/uploads/...` desde el API. */
+export type PostEstudioBody = {
+  fosil_id: number;
+  titulo: string;
+  contexto_objetivo: string;
+  tipo_analisis: string;
+  resultados: string;
+  composicion?: string | null;
+  condiciones_hallazgo?: string | null;
+  informacion_adicional?: string | null;
+  documentacion_contacto?: string | null;
+  publicado?: boolean;
+  /** Solo administradores: asignar otro investigador. */
+  investigador_id?: number;
+};
+
+export type PatchEstudioBody = Partial<
+  Pick<
+    PostEstudioBody,
+    | "titulo"
+    | "contexto_objetivo"
+    | "tipo_analisis"
+    | "resultados"
+    | "composicion"
+    | "condiciones_hallazgo"
+    | "informacion_adicional"
+    | "documentacion_contacto"
+    | "publicado"
+    | "investigador_id"
+  >
+>;
+
+export async function postEstudio(body: PostEstudioBody): Promise<{ id: number; fosil_id: number }> {
+  const res = await apiFetch("/api/estudios", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(typeof data.error === "string" ? data.error : "No se pudo registrar el estudio");
+  }
+  return data as { id: number; fosil_id: number };
+}
+
+export async function patchEstudio(
+  id: number,
+  body: PatchEstudioBody,
+): Promise<{ id: number }> {
+  const res = await apiFetch(`/api/estudios/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(typeof data.error === "string" ? data.error : "No se pudo actualizar el estudio");
+  }
+  return data as { id: number };
+}
+
+export async function deleteEstudio(
+  id: number,
+  body?: { motivo?: string },
+): Promise<{ mensaje: string; id: number }> {
+  const res = await apiFetch(`/api/estudios/${id}`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body || {}),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(typeof data.error === "string" ? data.error : "No se pudo archivar el estudio");
+  }
+  return data as { mensaje: string; id: number };
+}
+
+export type PostReferenciaBody = {
+  titulo: string;
+  url: string;
+  tipo?: string;
+  autores?: string;
+  anio?: number | string;
+};
+
+export async function postReferenciaEstudio(
+  estudioId: number,
+  body: PostReferenciaBody,
+): Promise<{ id: number }> {
+  const res = await apiFetch(`/api/estudios/${estudioId}/referencias`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(typeof data.error === "string" ? data.error : "No se pudo agregar la referencia");
+  }
+  return data as { id: number };
+}
+
+export async function deleteReferenciaEstudio(
+  refId: number,
+): Promise<{ mensaje: string; id: number }> {
+  const res = await apiFetch(`/api/estudios/referencias/${refId}`, {
+    method: "DELETE",
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(typeof data.error === "string" ? data.error : "No se pudo eliminar la referencia");
+  }
+  return data as { mensaje: string; id: number };
+}
+
+/**
+ * URL absoluta a archivos bajo /images, /videos, /uploads (servidos por Express en el API).
+ * Usa `NEXT_PUBLIC_API_URL` (p. ej. `http://localhost:4000`). Desde otra máquina en la misma red,
+ * `NEXT_PUBLIC_API_URL=http://<IP-de-tu-PC>:4000` en el frontend.
+ */
 export function multimediaAbsUrl(urlPath: string): string {
   if (urlPath.startsWith("http://") || urlPath.startsWith("https://")) {
     return urlPath;
   }
-  const base = getApiBaseUrl();
+  const base = getApiBaseUrl().replace(/\/$/, "");
   const p = urlPath.startsWith("/") ? urlPath : `/${urlPath}`;
   const encodedPath = encodeURI(p);
-  // Proxy interno de Next para evitar problemas cuando el front se abre por IP LAN
-  // y NEXT_PUBLIC_API_URL usa localhost.
-  if (
-    p.startsWith("/images/") ||
-    p.startsWith("/videos/") ||
-    p.startsWith("/uploads/")
-  ) {
-    return `/__api-media${encodedPath}`;
-  }
   return `${base}${encodedPath}`;
 }
 

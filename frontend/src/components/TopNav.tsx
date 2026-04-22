@@ -95,11 +95,12 @@ export function TopNav() {
         })}
       </ul>
 
-      <NavAuth />
-
-      <Link href="/contacto" className="nav-cta" onClick={() => setOpen(false)}>
-        Contáctanos
-      </Link>
+      <div className="nav-trailing">
+        <NavAuth />
+        <Link href="/contacto" className="nav-cta nav-cta-contact" onClick={() => setOpen(false)}>
+          Contáctanos
+        </Link>
+      </div>
 
       <button
         type="button"

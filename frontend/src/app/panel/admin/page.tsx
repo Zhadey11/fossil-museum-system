@@ -19,6 +19,8 @@ import {
   fetchMisRegistros,
   fetchRolesCatalogo,
   patchAdminContactoLeido,
+  patchAdminContactoAprobarSolicitud,
+  patchAdminContactoRechazarSolicitud,
   deleteAdminContacto,
   patchAdminAprobar,
   patchAdminAprobarSolicitudInv,
@@ -47,11 +49,39 @@ import type {
 } from "@/lib/api";
 import { NEED_ADMIN } from "@/lib/panelNeeds";
 
+function esSolicitudAccesoContacto(m: ContactoAdminRow): boolean {
+  const t = (m.solicitud_tipo || "").toLowerCase();
+  if (t === "investigador" || t === "explorador" || t === "colaborador") return true;
+  return /Quiero ser investigador|Quiero ser explorador|Propuesta de colaboración/i.test(
+    m.asunto || "",
+  );
+}
+
+function solicitudContactoPendiente(m: ContactoAdminRow): boolean {
+  const e = (m.solicitud_estado || "").toLowerCase();
+  return esSolicitudAccesoContacto(m) && e !== "aprobada" && e !== "rechazada";
+}
+
+function etiquetaTipoContactoSolicitud(m: ContactoAdminRow): string {
+  const t = (m.solicitud_tipo || "").toLowerCase();
+  if (t === "investigador") return "Investigador";
+  if (t === "explorador") return "Explorador";
+  if (t === "colaborador") return "Colaborador";
+  if (/Quiero ser investigador/i.test(m.asunto || "")) return "Investigador";
+  if (/Quiero ser explorador/i.test(m.asunto || "")) return "Explorador";
+  if (/Propuesta de colaboración/i.test(m.asunto || "")) return "Colaborador";
+  return "Acceso";
+}
+
+function byContactDateDesc(a: ContactoAdminRow, b: ContactoAdminRow): number {
+  return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+}
+
 const cardStyle: CSSProperties = {
   border: "1px solid var(--border)",
   background: "var(--card)",
   borderRadius: "10px",
-  padding: "1.25rem",
+  padding: "1.5rem 1.4rem",
 };
 
 const PAGE_SIZE = 10;
@@ -105,27 +135,27 @@ function Pager({
 }) {
   if (totalPages <= 1) return null;
   return (
-    <div className="mt-2 flex items-center justify-end gap-2 text-sm">
+    <div style={{ marginTop: "0.75rem", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "0.6rem", fontSize: "0.92rem" }}>
       <button
         type="button"
-        className="rounded-sm border px-2 py-1"
-        style={{ borderColor: "var(--border)" }}
+        className="panel-btn"
         onClick={onPrev}
         disabled={page <= 1}
+        style={{ opacity: page <= 1 ? 0.45 : 1 }}
       >
-        Anterior
+        &lt; Anterior
       </button>
-      <span className="text-[var(--bonedim)]">
-        Página {page} de {totalPages}
+      <span style={{ color: "var(--bonedim)", minWidth: "7rem", textAlign: "center" }}>
+        Página {page} / {totalPages}
       </span>
       <button
         type="button"
-        className="rounded-sm border px-2 py-1"
-        style={{ borderColor: "var(--border)" }}
+        className="panel-btn"
         onClick={onNext}
         disabled={page >= totalPages}
+        style={{ opacity: page >= totalPages ? 0.45 : 1 }}
       >
-        Siguiente
+        Siguiente &gt;
       </button>
     </div>
   );
@@ -179,8 +209,8 @@ function StatCard({
 }) {
   return (
     <article style={cardStyle}>
-      <p className="text-xs uppercase tracking-[0.12em] text-[var(--bonedim)]">{label}</p>
-      <p className="mt-2 text-2xl font-semibold text-[var(--bone)]">{value}</p>
+      <p style={{ fontSize: "0.78rem", textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--bonedim)" }}>{label}</p>
+      <p style={{ marginTop: "0.6rem", fontSize: "1.9rem", fontWeight: 600, color: "var(--bone)", lineHeight: 1.1 }}>{value}</p>
     </article>
   );
 }
@@ -209,8 +239,14 @@ function AdminContent() {
     | { type: "delete-subscriber"; id: number }
     | { type: "reject-fosil"; id: number }
     | { type: "reject-sol"; id: number }
+    | { type: "reject-contact-sol"; id: number }
     | null
   >(null);
+  const [contactoApproveRow, setContactoApproveRow] = useState<ContactoAdminRow | null>(null);
+  /** Correo para iniciar sesión en la página (puede diferir del correo del formulario). */
+  const [contactoApproveEmail, setContactoApproveEmail] = useState("");
+  const [contactoApprovePassword, setContactoApprovePassword] = useState("");
+  const [busyContactoSolId, setBusyContactoSolId] = useState<number | null>(null);
   const [newUser, setNewUser] = useState({
     nombre: "",
     apellido: "",
@@ -620,6 +656,12 @@ function AdminContent() {
   );
   const solicitudesPendientesRows = solInv.filter((s) => s.estado === "pendiente");
   const solicitudesHistorialRows = solInv.filter((s) => s.estado !== "pendiente");
+  const contactoAccesoPendientesRows = contactos
+    .filter(solicitudContactoPendiente)
+    .sort(byContactDateDesc);
+  const contactoAccesoHistorialRows = contactos
+    .filter((m) => esSolicitudAccesoContacto(m) && !solicitudContactoPendiente(m))
+    .sort(byContactDateDesc);
   const selectedContacto =
     contactos.find((m) => m.id === selectedContactoId) || contactPageRows[0] || null;
   const readVisibleIds = contactosVisible.filter((m) => isRead(m)).map((m) => m.id);
@@ -669,7 +711,8 @@ function AdminContent() {
         {menuItems.map((item) => {
           const active = activeSection === item.id;
           const hasNotice =
-            (item.id === "solicitudes" && solicitudesPendientesRows.length > 0) ||
+            (item.id === "solicitudes" &&
+              (solicitudesPendientesRows.length > 0 || contactoAccesoPendientesRows.length > 0)) ||
             (item.id === "pendientes" && totalPendientes > 0) ||
             (item.id === "contacto" && mensajesSinLeer > 0);
           return (
@@ -677,13 +720,16 @@ function AdminContent() {
               key={item.id}
               type="button"
               onClick={() => setActiveSection(item.id)}
-              className="rounded-sm border px-3 py-1.5 text-sm"
+              className="rounded-sm border"
               style={{
                 borderColor: active ? "var(--amber)" : "var(--border)",
                 color: active ? "var(--amberhot)" : "var(--bone)",
                 background: active ? "rgba(200,130,10,.12)" : "transparent",
-                minHeight: "2.2rem",
-                paddingInline: "0.95rem",
+                minHeight: "2.4rem",
+                padding: "0.45rem 1.1rem",
+                fontSize: "0.9rem",
+                fontWeight: active ? 600 : 400,
+                letterSpacing: "0.04em",
               }}
             >
               <span style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
@@ -708,17 +754,11 @@ function AdminContent() {
       </section>
 
       {activeSection === "resumen" ? (
-        <section
-          style={{
-            display: "grid",
-            gridTemplateColumns: "2fr 1fr",
-            gap: "1rem",
-            marginBottom: "1.25rem",
-          }}
-        >
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(140px, 1fr))", gap: "0.75rem" }}>
+        <section className="admin-dash-layout">
+          <div className="admin-stat-grid">
             <StatCard label="Hallazgos pendientes" value={totalPendientes} />
             <StatCard label="Solicitudes investigación" value={solicitudesPendientes} />
+            <StatCard label="Acceso vía contacto" value={contactoAccesoPendientesRows.length} />
             <StatCard label="Usuarios activos" value={usuariosActivos} />
             <StatCard label="Mensajes sin leer" value={mensajesSinLeer} />
           </div>
@@ -775,6 +815,12 @@ function AdminContent() {
                       fecha: String(s.created_at),
                       estado: s.estado,
                     })),
+                    ...contactoAccesoPendientesRows.slice(0, 2).map((c) => ({
+                      tipo: "Acceso (contacto)",
+                      detalle: `${etiquetaTipoContactoSolicitud(c)} — ${c.nombre}`,
+                      fecha: String(c.created_at),
+                      estado: "pendiente",
+                    })),
                   ]
                     .slice(0, 6)
                     .map((r, i) => (
@@ -799,13 +845,93 @@ function AdminContent() {
         <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
           <div>
             <h2 className="sec-h" style={{ fontSize: "1.2rem" }}>
-              Solicitudes de acceso (investigación)
+              Solicitudes
             </h2>
             <p className="sec-body" style={{ marginTop: "0.25rem" }}>
-              Gestión de solicitudes de investigadores para acceder al detalle científico.
+              Pedidos que llegan por el formulario de contacto (cuentas de explorador, investigador o
+              colaborador) y solicitudes de investigadores para ver detalle científico en el catálogo.
             </p>
           </div>
         </div>
+
+        <h3 className="sec-h" style={{ fontSize: "1.05rem", margin: "0 0 0.65rem" }}>
+          Acceso al sistema (formulario contacto)
+        </h3>
+        {contactoAccesoPendientesRows.length === 0 ? (
+          <p className="sec-body" style={{ marginBottom: "1.25rem" }}>
+            No hay solicitudes de acceso pendientes desde contacto.
+          </p>
+        ) : (
+          <div className="mb-6 grid gap-3">
+            {contactoAccesoPendientesRows.map((m) => (
+              <article
+                key={m.id}
+                className="rounded-sm border p-3"
+                style={{ borderColor: "var(--border)", background: "var(--surface)" }}
+              >
+                <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-medium text-[var(--bone)]">{m.nombre}</p>
+                    <p className="text-xs text-[var(--bonedim)]">{m.email}</p>
+                    <span
+                      className="mt-1 inline-block rounded-full border px-2 py-0.5 text-[10px]"
+                      style={{ borderColor: "var(--amber)", color: "var(--amberhot)" }}
+                    >
+                      {etiquetaTipoContactoSolicitud(m)}
+                    </span>
+                  </div>
+                  <span className="text-xs text-[var(--bonedim)]">{formatInboxDate(String(m.created_at))}</span>
+                </div>
+                <p className="text-sm text-[var(--bone)]">{m.asunto}</p>
+                <p className="mt-2 line-clamp-4 text-sm text-[var(--bonedim)]">{m.mensaje}</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className="rounded-sm border px-3 py-1.5 text-sm"
+                    style={{ borderColor: "rgba(30,140,70,.5)", color: "#9be3b8" }}
+                    disabled={busyContactoSolId === m.id}
+                    onClick={() => {
+                      setContactoApproveRow(m);
+                      setContactoApproveEmail(m.email.trim());
+                      setContactoApprovePassword("");
+                    }}
+                  >
+                    Aceptar y crear usuario
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-sm border px-3 py-1.5 text-sm"
+                    style={{ borderColor: "rgba(170,70,70,.5)", color: "#ffb0a8" }}
+                    disabled={busyContactoSolId === m.id}
+                    onClick={() => setDialog({ type: "reject-contact-sol", id: m.id })}
+                  >
+                    Rechazar
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-sm border px-3 py-1.5 text-sm"
+                    style={{ borderColor: "var(--border)" }}
+                    onClick={() => {
+                      setContactoSearch("");
+                      const idx = contactosVisible.findIndex((c) => c.id === m.id);
+                      if (idx >= 0) {
+                        setContactPage(Math.floor(idx / PAGE_SIZE) + 1);
+                      }
+                      setActiveSection("contacto");
+                      setSelectedContactoId(m.id);
+                    }}
+                  >
+                    Ver en bandeja contacto
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+
+        <h3 className="sec-h" style={{ fontSize: "1.05rem", margin: "0 0 0.65rem" }}>
+          Detalle científico (investigadores)
+        </h3>
         {solicitudesPendientesRows.length === 0 ? (
           <EmptyState text="No hay solicitudes pendientes de investigadores." />
         ) : (
@@ -852,10 +978,47 @@ function AdminContent() {
           </div>
         )}
         <h3 className="sec-h" style={{ fontSize: "1.05rem", margin: "1.2rem 0 0.6rem" }}>
-          Historial
+          Historial — acceso (contacto)
+        </h3>
+        {contactoAccesoHistorialRows.length === 0 ? (
+          <p className="sec-body" style={{ marginBottom: "1rem" }}>
+            Aún no hay solicitudes de contacto aprobadas o rechazadas.
+          </p>
+        ) : (
+          <div style={{ overflowX: "auto", marginBottom: "1.25rem" }}>
+            <table className="panel-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Nombre</th>
+                  <th>Correo</th>
+                  <th>Tipo</th>
+                  <th>Fecha</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {contactoAccesoHistorialRows.map((c) => (
+                  <tr key={c.id}>
+                    <td>{c.id}</td>
+                    <td>{c.nombre}</td>
+                    <td>{c.email}</td>
+                    <td>{etiquetaTipoContactoSolicitud(c)}</td>
+                    <td>{formatInboxDate(String(c.created_at))}</td>
+                    <td>
+                      <EstadoChip estado={c.solicitud_estado || "—"} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <h3 className="sec-h" style={{ fontSize: "1.05rem", margin: "1.2rem 0 0.6rem" }}>
+          Historial — detalle científico
         </h3>
         {solicitudesHistorialRows.length === 0 ? (
-          <EmptyState text="Sin solicitudes procesadas todavía." />
+          <EmptyState text="Sin solicitudes de investigación procesadas todavía." />
         ) : (
           <div style={{ overflowX: "auto" }}>
             <table className="panel-table">
@@ -1200,7 +1363,7 @@ function AdminContent() {
           Creación de usuarios, activación/desactivación y asignación de roles.
         </p>
         <div className="mb-3">
-          <div className="grid gap-2" style={{ gridTemplateColumns: "2fr 1fr" }}>
+          <div className="grid gap-2 admin-filter-row">
             <input
               value={usuariosSearch}
               onChange={(e) => setUsuariosSearch(e.target.value)}
@@ -1513,17 +1676,11 @@ function AdminContent() {
         {contactosVisible.length === 0 ? (
           <p className="sec-body">Aún no hay mensajes en contacto.</p>
         ) : (
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "minmax(260px, 340px) 1fr",
-              gap: "0.9rem",
-            }}
-          >
+          <div className="admin-contact-inbox">
             <aside className="rounded-sm border" style={{ borderColor: "var(--border)", maxHeight: "560px", overflow: "auto" }}>
               {contactPageRows.map((m) => {
                 const read = isRead(m);
-                const isSolicitud = /solicitud/i.test(m.asunto || "");
+                const isSolicitud = esSolicitudAccesoContacto(m);
                 const checked = selectedForDeleteIds.includes(m.id);
                 return (
                   <div
@@ -1564,7 +1721,11 @@ function AdminContent() {
                     </button>
                     {isSolicitud ? (
                       <span className="mt-1 inline-block rounded-full border px-2 py-0.5 text-[10px]" style={{ borderColor: "var(--amber)", color: "var(--amberhot)" }}>
-                        Solicitud
+                        {m.solicitud_estado === "aprobada"
+                          ? "Aprobada"
+                          : m.solicitud_estado === "rechazada"
+                            ? "Rechazada"
+                            : "Solicitud"}
                       </span>
                     ) : null}
                   </div>
@@ -1579,24 +1740,44 @@ function AdminContent() {
                   <h3 className="mt-3 text-lg text-[var(--bone)]">{selectedContacto.asunto}</h3>
                   <p className="mt-1 text-xs text-[var(--bonedim)]">{formatInboxDate(String(selectedContacto.created_at))}</p>
                   <p className="mt-4 whitespace-pre-wrap text-sm text-[var(--bonedim)]">{selectedContacto.mensaje}</p>
-                  {/solicitud/i.test(selectedContacto.asunto || "") ? (
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        className="rounded-sm border px-3 py-1.5 text-sm"
-                        style={{ borderColor: "rgba(30,140,70,.5)", color: "#9be3b8" }}
-                        onClick={() => setActiveSection("solicitudes")}
-                      >
-                        Aprobar
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded-sm border px-3 py-1.5 text-sm"
-                        style={{ borderColor: "rgba(170,70,70,.5)", color: "#ffb0a8" }}
-                        onClick={() => setActiveSection("solicitudes")}
-                      >
-                        Rechazar
-                      </button>
+                  {esSolicitudAccesoContacto(selectedContacto) ? (
+                    <div className="mt-4 flex flex-col gap-2">
+                      <p className="text-xs text-[var(--bonedim)]">
+                        Estado:{" "}
+                        <strong className="text-[var(--bone)]">
+                          {selectedContacto.solicitud_estado === "aprobada"
+                            ? "Aprobada (usuario creado)"
+                            : selectedContacto.solicitud_estado === "rechazada"
+                              ? "Rechazada"
+                              : "Pendiente de revisión"}
+                        </strong>
+                      </p>
+                      {solicitudContactoPendiente(selectedContacto) ? (
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            className="rounded-sm border px-3 py-1.5 text-sm"
+                            style={{ borderColor: "rgba(30,140,70,.5)", color: "#9be3b8" }}
+                            disabled={busyContactoSolId === selectedContacto.id}
+                            onClick={() => {
+                              setContactoApproveRow(selectedContacto);
+                              setContactoApproveEmail(selectedContacto.email.trim());
+                              setContactoApprovePassword("");
+                            }}
+                          >
+                            Aceptar y crear usuario
+                          </button>
+                          <button
+                            type="button"
+                            className="rounded-sm border px-3 py-1.5 text-sm"
+                            style={{ borderColor: "rgba(170,70,70,.5)", color: "#ffb0a8" }}
+                            disabled={busyContactoSolId === selectedContacto.id}
+                            onClick={() => setDialog({ type: "reject-contact-sol", id: selectedContacto.id })}
+                          >
+                            Rechazar solicitud
+                          </button>
+                        </div>
+                      ) : null}
                     </div>
                   ) : null}
                 </>
@@ -1658,6 +1839,104 @@ function AdminContent() {
           </ul>
         </div>
       </section>
+      ) : null}
+      {contactoApproveRow ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-[195] grid place-items-center p-4"
+          style={{ background: "rgba(0,0,0,.55)" }}
+          onClick={() => !busyContactoSolId && setContactoApproveRow(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-sm border p-4"
+            style={{ borderColor: "var(--border)", background: "var(--card)" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="sec-h" style={{ fontSize: "1.15rem", marginBottom: "0.35rem" }}>
+              Crear usuario — {etiquetaTipoContactoSolicitud(contactoApproveRow)}
+            </h3>
+            <p className="text-sm text-[var(--bonedim)]">
+              {contactoApproveRow.nombre} · Las notificaciones (acuse, aprobación, rechazo){" "}
+              <strong className="text-[var(--bone)]">siempre se envían al correo del formulario</strong>. Abajo definís
+              el correo con el que entrará a la página y la contraseña de esa cuenta.
+            </p>
+            <p className="mt-2 rounded-sm border px-3 py-2 text-xs text-[var(--bonedim)]" style={{ borderColor: "var(--border)", background: "var(--surface)" }}>
+              Correo del formulario (recibe los mails):{" "}
+              <span className="text-[var(--bone)]">{contactoApproveRow.email.trim()}</span>
+            </p>
+            <label className="mt-3 flex flex-col gap-1 text-sm text-[var(--bonedim)]">
+              Correo para iniciar sesión en la página (cuenta)
+              <input
+                type="email"
+                autoComplete="off"
+                value={contactoApproveEmail}
+                onChange={(e) => setContactoApproveEmail(e.target.value)}
+                className="rounded-sm border px-3 py-2 text-[var(--bone)]"
+                style={{ background: "var(--surface)", borderColor: "var(--border)" }}
+              />
+            </label>
+            <label className="mt-3 flex flex-col gap-1 text-sm text-[var(--bonedim)]">
+              Contraseña (mín. 8 caracteres)
+              <input
+                type="password"
+                autoComplete="new-password"
+                value={contactoApprovePassword}
+                onChange={(e) => setContactoApprovePassword(e.target.value)}
+                className="rounded-sm border px-3 py-2 text-[var(--bone)]"
+                style={{ background: "var(--surface)", borderColor: "var(--border)" }}
+              />
+            </label>
+            <div className="mt-4 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                className="btn-out"
+                disabled={busyContactoSolId != null}
+                onClick={() => setContactoApproveRow(null)}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn-fill"
+                disabled={busyContactoSolId != null}
+                onClick={async () => {
+                  const em = contactoApproveEmail.trim();
+                  const correoFormulario = contactoApproveRow.email.trim();
+                  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) {
+                    window.alert("Ingresá un correo válido para la cuenta (inicio de sesión en la página).");
+                    return;
+                  }
+                  if (contactoApprovePassword.length < 8) {
+                    window.alert("La contraseña debe tener al menos 8 caracteres.");
+                    return;
+                  }
+                  setBusyContactoSolId(contactoApproveRow.id);
+                  try {
+                    const r = await patchAdminContactoAprobarSolicitud(contactoApproveRow.id, {
+                      email: em,
+                      password: contactoApprovePassword,
+                    });
+                    await refreshAll();
+                    setContactoApproveRow(null);
+                    setContactoApprovePassword("");
+                    window.alert(
+                      r.correo_credenciales_enviado
+                        ? `Usuario creado. Se enviaron las credenciales al correo del formulario: ${correoFormulario}`
+                        : `Usuario creado, pero no se envió el correo a ${correoFormulario}.\n\nDetalle: ${r.correo_error || "revisá MAIL_* en backend/.env, firewall y consola del servidor."}`,
+                    );
+                  } catch (e) {
+                    window.alert(e instanceof Error ? e.message : "Error al aprobar");
+                  } finally {
+                    setBusyContactoSolId(null);
+                  }
+                }}
+              >
+                {busyContactoSolId != null ? "Creando…" : "Crear y enviar correo"}
+              </button>
+            </div>
+          </div>
+        </div>
       ) : null}
       {createUserOpen ? (
         <div
@@ -1756,6 +2035,8 @@ function AdminContent() {
                 ? "Eliminar suscriptor"
             : dialog?.type === "reject-sol"
               ? "Rechazar solicitud"
+              : dialog?.type === "reject-contact-sol"
+                ? "Rechazar solicitud de acceso"
               : "Rechazar registro"
         }
         message={
@@ -1769,17 +2050,23 @@ function AdminContent() {
                 ? "¿Eliminar suscriptor?"
             : dialog?.type === "reject-sol"
               ? "Podés añadir una nota para el investigador."
+              : dialog?.type === "reject-contact-sol"
+                ? "Se notificará al correo del formulario. No se crean credenciales."
               : "¿Rechazar este registro? Quedará marcado como rechazado."
         }
         confirmLabel={
-          dialog?.type === "reject-sol" || dialog?.type === "reject-fosil"
+          dialog?.type === "reject-sol" ||
+          dialog?.type === "reject-fosil" ||
+          dialog?.type === "reject-contact-sol"
             ? "Confirmar rechazo"
             : "Eliminar"
         }
-        askNote={dialog?.type === "reject-sol"}
+        askNote={dialog?.type === "reject-sol" || dialog?.type === "reject-contact-sol"}
         noteLabel="Motivo del rechazo"
         notePlaceholder="Opcional"
-        busy={busyUsuarioId != null || busySolId != null || busyId != null}
+        busy={
+          busyUsuarioId != null || busySolId != null || busyId != null || busyContactoSolId != null
+        }
         onCancel={() => setDialog(null)}
         onConfirm={(note) => {
           if (!dialog) return;
@@ -1806,6 +2093,26 @@ function AdminContent() {
           }
           if (dialog.type === "reject-sol") {
             onRechazarSolicitudInv(dialog.id, note || "").finally(() => setDialog(null));
+            return;
+          }
+          if (dialog.type === "reject-contact-sol") {
+            setBusyContactoSolId(dialog.id);
+            patchAdminContactoRechazarSolicitud(dialog.id, { nota: note || "" })
+              .then(async (r) => {
+                await refreshAll();
+                window.alert(
+                  r.correo_rechazo_enviado
+                    ? "Solicitud rechazada. Se envió correo al solicitante."
+                    : `Rechazo registrado, pero el correo no salió.\n\nDetalle: ${r.correo_error || "revisá MAIL_* en backend/.env."}`,
+                );
+              })
+              .catch((e) =>
+                window.alert(e instanceof Error ? e.message : "Error al rechazar"),
+              )
+              .finally(() => {
+                setBusyContactoSolId(null);
+                setDialog(null);
+              });
             return;
           }
           onRechazar(dialog.id).finally(() => setDialog(null));

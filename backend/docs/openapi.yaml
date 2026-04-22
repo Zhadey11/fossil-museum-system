@@ -20,6 +20,14 @@ paths:
       responses:
         "200":
           description: Token JWT
+  /api/auth/register:
+    post:
+      summary: Registro público (investigador o explorador)
+      requestBody:
+        required: true
+      responses:
+        "201":
+          description: Cuenta creada
   /api/auth/logout:
     post:
       summary: Cerrar sesión
@@ -61,9 +69,9 @@ paths:
     get:
       summary: Puntos para mapa público (fósiles publicados)
       description: |
-        Devuelve solo los campos mínimos para renderizar el mapa público:
-        id, slug, nombre, latitud, longitud, categoría, portada y jerarquía
-        geográfica (cantón, provincia, país) cuando existan en BD.
+        Campos mínimos para el mapa público. Las propiedades latitud/longitud NO son el GPS
+        del espécimen: son una posición aproximada derivada (privacidad). El GPS real solo
+        se expone en endpoints autenticados para roles autorizados.
       responses:
         "200":
           description: Lista de puntos del mapa público
@@ -127,6 +135,9 @@ paths:
   /api/multimedia/publico/catalogo:
     get:
       summary: Listar imágenes públicas del catálogo (paginado)
+      description: |
+        Solo filas cuyo archivo exista bajo el backend, salvo `incluir_sin_archivo=1`.
+        El total y la paginación respetan ese filtro.
       parameters:
         - in: query
           name: q
@@ -149,6 +160,14 @@ paths:
         - in: query
           name: page_size
           schema: { type: integer }
+        - in: query
+          name: include_total
+          description: 1 = incluir conteo en la respuesta
+          schema: { type: string }
+        - in: query
+          name: incluir_sin_archivo
+          description: 1 = incluir entradas cuyo fichero no exista en disco (solo depuración)
+          schema: { type: string }
       responses:
         "200": { description: Lista de imágenes públicas }
   /api/estudios:
@@ -332,8 +351,113 @@ paths:
         "200": { description: Lista de mensajes }
     post:
       summary: Enviar mensaje de contacto
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nombre, email, asunto, mensaje]
+              properties:
+                nombre: { type: string }
+                email: { type: string, format: email }
+                asunto: { type: string }
+                mensaje: { type: string }
+                tipo_solicitud:
+                  type: string
+                  enum: [general, investigador, explorador, colaborador]
+                  description: >
+                    Si no es general, el mensaje queda como solicitud pendiente;
+                    con SMTP configurado se envía acuse al correo del solicitante.
       responses:
         "200": { description: Mensaje recibido }
+        "400": { description: Datos inválidos (p. ej. correo mal formado) }
+  /api/contacto/{id}/leido:
+    patch:
+      summary: Marcar mensaje leído o no leído (admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                leido: { type: boolean }
+      responses:
+        "200": { description: Actualizado }
+  /api/contacto/{id}/aprobar-solicitud:
+    patch:
+      summary: Aprobar solicitud de acceso y crear usuario (admin)
+      description: >
+        Crea cuenta con rol según tipo de solicitud, marca CONTACTO como aprobada
+        y envía correo con credenciales si SMTP está configurado.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: >
+                    Correo de la cuenta para iniciar sesión en la página. Las notificaciones siempre se envían al correo del formulario de contacto.
+                password:
+                  type: string
+                  minLength: 8
+                  description: Contraseña inicial; si no se envía, el backend genera una temporal.
+      responses:
+        "200": { description: Usuario creado; correo de credenciales si aplica }
+        "400": { description: No es solicitud, ya resuelta, o correo duplicado }
+        "404": { description: Mensaje no encontrado }
+  /api/contacto/{id}/rechazar-solicitud:
+    patch:
+      summary: Rechazar solicitud de acceso (admin)
+      description: Marca la solicitud rechazada y notifica al correo del formulario (sin credenciales).
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nota: { type: string, description: Texto opcional para el correo de rechazo }
+      responses:
+        "200": { description: Solicitud rechazada }
+        "400": { description: No es solicitud o ya resuelta }
+        "404": { description: Mensaje no encontrado }
+  /api/contacto/{id}:
+    delete:
+      summary: Eliminar mensaje de contacto (admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200": { description: Mensaje eliminado }
   /api/catalogos/fosil-form:
     get:
       summary: Catálogos para formulario de fósil (admin/explorador)
@@ -437,8 +561,9 @@ components:
         id: { type: integer }
         slug: { type: string, nullable: true }
         nombre: { type: string }
-        latitud: { type: number }
-        longitud: { type: number }
+        latitud: { type: number, description: Aproximada, no es el GPS del hallazgo }
+        longitud: { type: number, description: Aproximada, no es el GPS del hallazgo }
+        ubicacion_mapa_aproximada: { type: boolean }
         categoria_codigo: { type: string, nullable: true }
         portada_url: { type: string, nullable: true }
         canton_nombre: { type: string, nullable: true }

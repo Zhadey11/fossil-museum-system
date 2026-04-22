@@ -97,6 +97,8 @@ app.use(cookieParser());
 app.use(audit);
 
 const mediaStaticOptions = {
+  // Sin 301 a carpetas: si la URL apunta a un directorio, 404 (evita redirecciones raras con proxies).
+  redirect: false,
   etag: true,
   lastModified: true,
   maxAge: "1d",

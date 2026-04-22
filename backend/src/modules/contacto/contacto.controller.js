@@ -5,7 +5,8 @@ const sendMensaje = async (req, res) => {
     const data = await service.enviarMensaje(req.body);
     res.json(data);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    const code = error.statusCode || 500;
+    res.status(code).json({ error: error.message });
   }
 };
 
@@ -45,4 +46,44 @@ const eliminarMensaje = async (req, res) => {
   }
 };
 
-module.exports = { sendMensaje, listarMensajes, marcarLeido, eliminarMensaje };
+const aprobarSolicitud = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!id) {
+      return res.status(400).json({ error: "ID inválido" });
+    }
+    const data = await service.aprobarSolicitudContacto(id, req.user.id, {
+      password: req.body?.password,
+      email: req.body?.email,
+    });
+    res.json(data);
+  } catch (error) {
+    const code = error.statusCode || 500;
+    res.status(code).json({ error: error.message || "Error al aprobar solicitud" });
+  }
+};
+
+const rechazarSolicitud = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!id) {
+      return res.status(400).json({ error: "ID inválido" });
+    }
+    const data = await service.rechazarSolicitudContacto(id, req.user.id, {
+      nota: req.body?.nota,
+    });
+    res.json(data);
+  } catch (error) {
+    const code = error.statusCode || 500;
+    res.status(code).json({ error: error.message || "Error al rechazar solicitud" });
+  }
+};
+
+module.exports = {
+  sendMensaje,
+  listarMensajes,
+  marcarLeido,
+  eliminarMensaje,
+  aprobarSolicitud,
+  rechazarSolicitud,
+};

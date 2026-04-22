@@ -63,7 +63,7 @@ export default async function FosilFichaPage({ params }: Props) {
             gap: "1.25rem",
           }}
         >
-          <Link href="/catalogo" className="catalog-back-link">← Volver a la colección</Link>
+          <Link href="/catalogo" className="catalog-back-link">&lt; Volver a la colección</Link>
           <section className="fossil-hero-grid">
             <div className="fossil-main-visual">
               {/* eslint-disable-next-line @next/next/no-img-element */}

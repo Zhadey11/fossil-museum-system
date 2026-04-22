@@ -86,14 +86,14 @@ export default function HistoriaPage() {
           </p>
           <div className="historia-cta-btns">
             <Link href="/tiempo-profundo" className="btn-out">
-              Explorar la línea del tiempo →
+              Explorar la línea del tiempo &gt;
             </Link>
             <Link href="/catalogo" className="btn-fill">
               Ver colección
             </Link>
           </div>
           <Link href="/" className="historia-back">
-            ← Volver al inicio
+            &lt; Volver al inicio
           </Link>
         </Reveal>
       </article>

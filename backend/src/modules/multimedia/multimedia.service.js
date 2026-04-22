@@ -87,7 +87,24 @@ const obtenerMultimediaPublico = async (fosil_id) => {
   return obtenerMultimedia(fosil_id);
 };
 
-/** Catálogo público por imagen: devuelve TODAS las imágenes publicadas con datos básicos del fósil. */
+/** Ruta pública (MULTIMEDIA.url) resuelve a un archivo bajo `backend/`. */
+function archivoMultimediaExisteEnDisco(urlImagen) {
+  if (!urlImagen || typeof urlImagen !== "string") return false;
+  const p = diskPathFromPublicUrl(urlImagen);
+  if (!p) return false;
+  try {
+    return fs.existsSync(p) && fs.statSync(p).isFile();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Catálogo público por imagen: imágenes de fósiles publicados.
+ * Por defecto solo entran filas cuyo archivo exista en disco (nada de tarjeta "sin foto").
+ * Depurar: `?incluir_sin_archivo=1` lista también filas con URL en BD y archivo faltante.
+ * Paginación en memoria tras filtrar: incluye **todas** las imágenes válidas (hasta límite SQL).
+ */
 const obtenerCatalogoPublicoImagenes = async (query) => {
   const request = pool.request();
   let whereSql = `
@@ -132,11 +149,15 @@ const obtenerCatalogoPublicoImagenes = async (query) => {
   }
   const page = Math.max(1, parseInt(query.page, 10) || 1);
   const pageSize = Math.min(100, Math.max(1, parseInt(query.page_size, 10) || 24));
-  const offset = (page - 1) * pageSize;
-  request.input("offset", offset).input("fetch_size", pageSize + 1);
+  const incluirSinArchivo =
+    query.incluir_sin_archivo === "1" ||
+    query.incluir_sin_archivo === "true" ||
+    query.incluir_sin_archivo === 1;
+
+  const CATALOGO_MAX = 15_000;
 
   const selectSql = `
-    SELECT
+    SELECT TOP (${CATALOGO_MAX})
       m.id AS multimedia_id,
       m.url AS imagen_url,
       m.nombre_archivo,
@@ -170,39 +191,24 @@ const obtenerCatalogoPublicoImagenes = async (query) => {
     LEFT JOIN PAIS pa ON pa.id = prov.pais_id
     ${whereSql}
     ORDER BY f.created_at DESC, m.es_principal DESC, m.orden ASC, m.id ASC
-    OFFSET @offset ROWS FETCH NEXT @fetch_size ROWS ONLY
   `;
   const result = await request.query(selectSql);
-  const rows = result.recordset || [];
-  const hasNext = rows.length > pageSize;
-  const items = hasNext ? rows.slice(0, pageSize) : rows;
+  const rawRows = result.recordset || [];
+  const visibles = incluirSinArchivo
+    ? rawRows
+    : rawRows.filter((row) => archivoMultimediaExisteEnDisco(row.imagen_url));
+
+  const totalVisibles = visibles.length;
+  const from = (page - 1) * pageSize;
+  const items = visibles.slice(from, from + pageSize);
+  const hasNext = from + pageSize < totalVisibles;
 
   const includeTotal =
     query.include_total === "1" ||
     query.include_total === "true" ||
     query.include_total === 1 ||
     query.include_total === true;
-  let total = null;
-  if (includeTotal) {
-    const countRequest = pool.request();
-    if (query.periodo_id) countRequest.input("periodo_id", parseInt(query.periodo_id, 10));
-    if (query.era_id) countRequest.input("era_id", parseInt(query.era_id, 10));
-    if (query.categoria_id) countRequest.input("categoria_id", parseInt(query.categoria_id, 10));
-    if (query.q) countRequest.input("q", `%${String(query.q).trim()}%`);
-    if (query.ubicacion) countRequest.input("ubic", `%${String(query.ubicacion).trim()}%`);
-    if (query.subtipo) countRequest.input("subtipo", String(query.subtipo).trim());
-    const countSql = `
-      SELECT COUNT(1) AS total
-      FROM MULTIMEDIA m
-      INNER JOIN FOSIL f ON f.id = m.fosil_id
-      LEFT JOIN CATEGORIA_FOSIL cf ON cf.id = f.categoria_id
-      LEFT JOIN ERA_GEOLOGICA eg ON eg.id = f.era_id
-      LEFT JOIN PERIODO_GEOLOGICO pg ON pg.id = f.periodo_id
-      ${whereSql}
-    `;
-    const countResult = await countRequest.query(countSql);
-    total = Number(countResult.recordset?.[0]?.total ?? 0);
-  }
+  const total = includeTotal ? totalVisibles : null;
 
   return {
     items,

@@ -156,7 +156,7 @@ export function GaleriaClient({ items, fossils = [] }: Props) {
               setActive((v) => (v == null ? 0 : (v - 1 + filtered.length) % filtered.length));
             }}
           >
-            ‹
+            &lt;
           </button>
           <div className="gallery-lb-media">
             <Image
@@ -175,7 +175,7 @@ export function GaleriaClient({ items, fossils = [] }: Props) {
               setActive((v) => (v == null ? 0 : (v + 1) % filtered.length));
             }}
           >
-            ›
+            &gt;
           </button>
         </div>
       ) : null}
@@ -192,7 +192,7 @@ export function GaleriaClient({ items, fossils = [] }: Props) {
               setActiveFossil((v) => (v == null ? 0 : (v - 1 + fossils.length) % fossils.length));
             }}
           >
-            ‹
+            &lt;
           </button>
           <div className="gallery-lb-media">
             <Image
@@ -211,7 +211,7 @@ export function GaleriaClient({ items, fossils = [] }: Props) {
               setActiveFossil((v) => (v == null ? 0 : (v + 1) % fossils.length));
             }}
           >
-            ›
+            &gt;
           </button>
         </div>
       ) : null}

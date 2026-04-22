@@ -45,6 +45,10 @@ export function ContactForm() {
     "Experiencia en campo",
     "Código de verificación",
   ] as const;
+  const selectedFossils = (extra["Fósiles de interés"] || "")
+    .split(",")
+    .map((x) => x.trim())
+    .filter(Boolean);
   const emailTrim = email.trim();
   const emailInvalid =
     emailTrim.length > 0 && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrim);
@@ -118,10 +122,6 @@ export function ContactForm() {
     setExtraField(key, next.join(", "));
   }
 
-  const selectedFossils = (extra["Fósiles de interés"] || "")
-    .split(",")
-    .map((x) => x.trim())
-    .filter(Boolean);
   const isMissingInvestigator = (key: (typeof investigatorFields)[number]) =>
     motivo === "Quiero ser investigador" &&
     attemptedSubmit &&
@@ -149,7 +149,7 @@ export function ContactForm() {
     e.preventDefault();
     setAttemptedSubmit(true);
     if (motivo === "Quiero ser investigador") {
-      const faltantes = investigatorFields.filter(
+      const faltantes: string[] = investigatorFields.filter(
         (k) => (extra[k] || "").trim().length === 0,
       );
       if (selectedFossils.length === 0) faltantes.push("Fósiles de interés");
@@ -183,9 +183,34 @@ export function ContactForm() {
         .map(([k, v]) => `${k}: ${v}`)
         .join("\n");
       const cuerpo = [mensaje.trim(), extrasText ? `\n\n---\n${extrasText}` : ""].join("");
-      await postContacto({ nombre, email, asunto: `${motivo} - ${asunto}`, mensaje: cuerpo });
+      const tipoSolicitud =
+        motivo === "Quiero ser investigador"
+          ? "investigador"
+          : motivo === "Quiero ser explorador"
+            ? "explorador"
+            : motivo === "Propuesta de colaboración"
+              ? "colaborador"
+              : "general";
+      const res = (await postContacto({
+        nombre,
+        email,
+        asunto: `${motivo} - ${asunto}`,
+        mensaje: cuerpo,
+        tipo_solicitud: tipoSolicitud,
+      })) as {
+        correo_acuse_solicitante?: boolean | null;
+        correo_institucional_enviado?: boolean;
+      };
       setStatus("ok");
-      setMessage("Mensaje enviado. Gracias.");
+      if (tipoSolicitud !== "general") {
+        setMessage(
+          res.correo_acuse_solicitante
+            ? "Solicitud enviada. Revisá tu correo: te avisaremos ahí si te aceptan o no. Si te aprueban, el mensaje dirá claramente con qué correo entrar y tu contraseña (página Acceso del museo)."
+            : "Solicitud registrada. Si el servidor tiene SMTP, también te llegará el acuse; revisá spam. Usá un correo real: ahí recibís si te aceptan o no y, si aplica, tus datos de acceso.",
+        );
+      } else {
+        setMessage("Mensaje enviado. Gracias.");
+      }
       setNombre("");
       setEmail("");
       setAsunto("");
